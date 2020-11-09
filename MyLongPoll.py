@@ -1,7 +1,7 @@
-from vk_api.longpoll import VkLongPoll
+from vk_api.bot_longpoll import VkBotLongPoll
 
 
-class MyVkLongPoll(VkLongPoll):
+class MyVkLongPoll(VkBotLongPoll):
     def listen(self):
         while True:
             try:
