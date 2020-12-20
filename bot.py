@@ -1,6 +1,7 @@
 import requests
 import random
 import vk_api
+import datetime
 from MyLongPoll import MyVkLongPoll
 from data import db
 from vk_api import VkUpload
@@ -26,6 +27,56 @@ def send_msg(msg):
 
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
-        #vk.messages.send(user_id=event.object.message['user_id'], message='Привет', random_id=random.random())
-        send_msg("Hi")
-        print("Ok")
+        # vk.messages.send(user_id=event.object.message['user_id'], message='Привет', random_id=random.random())
+        user_msg = event.object['text']
+        if '@' in user_msg.split()[0]:
+            user_msg = user_msg[user_msg.find(' ') + 1:]
+        print(user_msg)
+
+        ''' 
+            show schedule // показать расписание с дз 
+            format: schedule [date] (optionally)
+        '''
+        if user_msg.split()[0] in ['sh', 'shed', 'schedule']:
+            # date: 'dd.mm'
+            pass
+
+        '''
+            add static schedule // добавить постоянное расписание
+            format: addschedule [day of week] <list of subjects>
+        '''
+        if user_msg.split()[0] in ['addschedule']:
+            # day of week: 'day name'
+            # list of subjects: 'subject name' by ', '
+            pass
+
+        '''
+            update schedule for specific date // обновить расписание на конкретную дату
+            format: updateschedule [date] <list of subjects>
+        '''
+        if user_msg.split()[0] in ['updateschedule', 'us']:
+            # date: 'dd.mm'
+            # list of subjects: 'subject name' by ', '
+            pass
+
+        '''
+            add homework for specific date // добавить дз на определенную дату
+            format: addhomework [date]
+                    [subject] [homework]
+        '''
+        if user_msg.split()[0] in ['addhw', 'addhomework', 'ah']:
+            # date: 'dd.mm'
+            # subject: 'subject name'
+            # homework: 'description of homework'
+            pass
+
+        '''
+            show help // показать помощь
+        '''
+        if user_msg.split()[0] in ['help']:
+            send_msg(
+                '''schedule [дата в формате дд.мм]
+                    -показывает расписание на завтрашний день, или на определенную дату (опционально)
+                addshedule
+                '''
+            )
