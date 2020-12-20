@@ -52,7 +52,7 @@ for event in longpoll.listen():
 
         '''
             update schedule for specific date // обновить расписание на конкретную дату
-            format: updateschedule [date] <list of subjects>
+            format: updateschedule [date](optionally) <list of subjects>
         '''
         if user_msg.split()[0] in ['updateschedule', 'us']:
             # date: 'dd.mm'
@@ -61,8 +61,8 @@ for event in longpoll.listen():
 
         '''
             add homework for specific date // добавить дз на определенную дату
-            format: addhomework [date]
-                    [subject] [homework]
+            format: addhomework [date](optionally)
+                    [subject]: [homework]
         '''
         if user_msg.split()[0] in ['addhw', 'addhomework', 'ah']:
             # date: 'dd.mm'
@@ -75,8 +75,33 @@ for event in longpoll.listen():
         '''
         if user_msg.split()[0] in ['help']:
             send_msg(
+                '''К боту нужно обращаться через @hosbobot
+                Примеры команд можете посмотреть в обсуждениях группы
+                schedule [дата в формате дд.мм]
+                    - показывает расписание на завтрашний день и закрепляет в беседе, или на определенную дату (опционально), можно sh, shed
+                addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
+                    - добавляет постоянное расписание на определенный день недели (по умолчанию на следующий учебный день)
+                updateshedule [дата в формате дд.мм] <список предметов через запятую>
+                    - изменить расписание на определенную дату (по умолчанию на следующий учебный день), можно us
+                addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
+                    - добавить или изменить задание на определенную дату (по умолчанию на следующий учебный день), можно addhw, ah
+                commands
+                    - показать список команд, cm
+                help
+                    - показать помощь
+                '''
+            )
+
+        '''
+            show commands // показать команды
+        '''
+        if user_msg.split()[0] in ['commands', 'cm']:
+            send_msg(
                 '''schedule [дата в формате дд.мм]
-                    -показывает расписание на завтрашний день, или на определенную дату (опционально)
-                addshedule
+                addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
+                updateshedule [дата в формате дд.мм] <список предметов через запятую>
+                addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
+                commands
+                help
                 '''
             )
