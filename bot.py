@@ -16,6 +16,8 @@ longpoll = MyVkLongPoll(vk_session, "200162959")
 # longpoll = VkBotLongPoll(vk_session, "200162959")
 conn, cursor = db("testdb")
 
+pin_now = "1488"
+
 
 def send_msg(msg):
     vk.messages.send(
@@ -38,21 +40,34 @@ for event in longpoll.listen():
 
         ''' 
             show schedule // показать расписание с дз 
-            format: schedule [date] (optionally)
+            format: schedule [day] (optionally)
         '''
         if user_msg[0] in ['sh', 'schedule']:
-            # date: 'dd.mm'
-            pass
-
+            cursor.execute(f'select lessons from schedule where id="{user_msg[1]}"')
+            data = eval(cursor.fetchall()[0][0])
+            schedule = "\n".join(data)
+            send_msg(schedule)
         '''
             add static schedule // добавить постоянное расписание
             format: addschedule [day of week] <list of subjects>
         '''
         if user_msg[0] in ['addschedule']:
             # day of week: day id(1-7)
-            # list of subjects: 'subject name' by ', '
-            pass
-
+            # pin for change
+            # list of subjects: 'subject name' by ' '
+            if user_msg[1] == pin_now:
+                id_day = user_msg[2]
+                lessons = user_msg[3:]
+                cursor.execute(f'select * from schedule where id="{id_day}"')
+                if cursor.fetchall():
+                    cursor.execute(f'update schedule set lessons="{str(lessons)}" where id="{id_day}"')
+                else:
+                    cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
+                    conn.commit()
+                schedule_now = "\n".join(lessons) + "Done"
+                send_msg(schedule_now)
+            else:
+                send_msg("Тебе так делать нельзя, фу!")
         '''
             update schedule for specific date // обновить расписание на конкретную дату
             format: updateschedule [date](optionally) <list of subjects>
