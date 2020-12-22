@@ -1,7 +1,7 @@
 import requests
 import random
 import vk_api
-import datetime
+from datetime import datetime, date
 from MyLongPoll import MyVkLongPoll
 from data import db
 from vk_api import VkUpload
@@ -43,8 +43,18 @@ for event in longpoll.listen():
             format: schedule [day] (optionally)
         '''
         if user_msg[0] in ['sh', 'schedule']:
-            cursor.execute(f'select lessons from schedule where id="{user_msg[1]}"')
-            data = eval(cursor.fetchall()[0][0])
+            if len(user_msg) > 1 and user_msg[1].isdigit():
+                day = int(user_msg[1])
+                if day >= 7:
+                    day = 1
+                cursor.execute(f'select lessons from schedule where id="{day}"')
+                data = eval(cursor.fetchall()[0][0])
+            else:
+                day = datetime.isoweekday(date.today()) + 1
+                if day >= 7:
+                    day = 1
+                cursor.execute(f'select lessons from schedule where id="{day}"')
+                data = eval(cursor.fetchall()[0][0])
             schedule = "\n".join(data)
             send_msg(schedule)
         '''
@@ -64,18 +74,10 @@ for event in longpoll.listen():
                 else:
                     cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
                     conn.commit()
-                schedule_now = "\n".join(lessons) + "Done"
+                schedule_now = "\n".join(lessons) + "\nDone"
                 send_msg(schedule_now)
             else:
                 send_msg("Тебе так делать нельзя, фу!")
-        '''
-            update schedule for specific date // обновить расписание на конкретную дату
-            format: updateschedule [date](optionally) <list of subjects>
-        '''
-        if user_msg[0] in ['updateschedule', 'us']:
-            # date: 'dd.mm'
-            # list of subjects: 'subject name' by ', '
-            pass
 
         '''
             add homework for specific date // добавить дз на определенную дату
@@ -93,7 +95,7 @@ for event in longpoll.listen():
         '''
         if user_msg[0] in ['help']:
             send_msg(
-                '''К боту нужно обращаться через @hosbobot
+                '''К боту в беседе нужно обращаться через @hosbobot
                 Примеры команд можете посмотреть в обсуждениях группы
                 schedule [дата в формате дд.мм]
                     - показывает расписание на завтрашний день и закрепляет в беседе, или на определенную дату (опционально), можно sh
@@ -117,7 +119,6 @@ for event in longpoll.listen():
             send_msg(
                 '''schedule [дата в формате дд.мм]
                 addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
-                updateschedule [дата в формате дд.мм] <список предметов через запятую>
                 addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
                 commands
                 help
