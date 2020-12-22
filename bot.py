@@ -17,6 +17,7 @@ longpoll = MyVkLongPoll(vk_session, "200162959")
 conn, cursor = db("testdb")
 
 pin_now = "1488"
+empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
 
 
 def send_msg(msg):
@@ -35,6 +36,9 @@ for event in longpoll.listen():
         user_msg = event.object['text'].split()
 
         if '@' in user_msg[0]:
+            if len(user_msg) == 1:
+                send_msg(random.choice(empty_req_answers))
+                continue
             user_msg = user_msg[1:]
         print(user_msg)
 
@@ -48,13 +52,12 @@ for event in longpoll.listen():
                 if day >= 7:
                     day = 1
                 cursor.execute(f'select lessons from schedule where id="{day}"')
-                data = eval(cursor.fetchall()[0][0])
             else:
                 day = datetime.isoweekday(date.today()) + 1
                 if day >= 7:
                     day = 1
                 cursor.execute(f'select lessons from schedule where id="{day}"')
-                data = eval(cursor.fetchall()[0][0])
+            data = eval(cursor.fetchall()[0][0])
             schedule = "\n".join(data)
             send_msg(schedule)
         '''
@@ -66,16 +69,19 @@ for event in longpoll.listen():
             # pin for change
             # list of subjects: 'subject name' by ' '
             if user_msg[1] == pin_now:
-                id_day = user_msg[2]
-                lessons = user_msg[3:]
-                cursor.execute(f'select * from schedule where id="{id_day}"')
-                if cursor.fetchall():
-                    cursor.execute(f'update schedule set lessons="{str(lessons)}" where id="{id_day}"')
+                id_day = int(user_msg[2])
+                if id_day < 1 or id_day > 6:
+                    send_msg(f"Воу-воу, палехче! Учебных дней шесть, а не {id_day}")
                 else:
-                    cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
-                    conn.commit()
-                schedule_now = "\n".join(lessons) + "\nDone"
-                send_msg(schedule_now)
+                    lessons = user_msg[3:]
+                    cursor.execute(f'select * from schedule where id="{id_day}"')
+                    if cursor.fetchall():
+                        cursor.execute(f'update schedule set lessons="{str(lessons)}" where id="{id_day}"')
+                    else:
+                        cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
+                        conn.commit()
+                    schedule_now = "\n".join(lessons) + "\nDone"
+                    send_msg(schedule_now)
             else:
                 send_msg("Тебе так делать нельзя, фу!")
 
