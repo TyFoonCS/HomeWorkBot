@@ -102,7 +102,7 @@ for event in longpoll.listen():
                     if cursor.fetchall():
                         cursor.execute(f'update schedule set lessons="{str(lessons)}" where id="{id_day}"')
                     else:
-                        cursor.execute(f'in sert into schedule values("{id_day}", "{str(lessons)}")')
+                        cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
                         conn.commit()
                     schedule_now = "\n".join(lessons) + "\nDone"
                     send_msg(schedule_now)
@@ -124,7 +124,11 @@ for event in longpoll.listen():
                 if day >= 1 or day <= 6:
                     text = " ".join(user_msg[2::])
                     if len(text) < 400:
-                        print(144, day, text)
+                        cursor.execute(f'select hw from days where id="{day}"')
+                        now = cursor.fetchall()[0][0]
+                        if now:
+                            text = now + '\n' + text
+                            cursor.execute(f'update days set hw="{text}" where id="{day}"')
                         cursor.execute(f'insert into days values ("{day}", "schedule", "{text}")')
                         conn.commit()
                         send_msg('Done')
