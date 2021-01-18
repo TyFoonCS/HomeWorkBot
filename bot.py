@@ -29,11 +29,21 @@ def send_msg(msg):
 
 
 for event in longpoll.listen():
+    print(event.object.keys())
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
 
         # vk.messages.send(user_id=event.object.message['user_id'], message='Привет', random_id=random.random())
 
         user_msg = event.object['text'].split()
+
+        '''if event.object['attachments']:
+            print(12, event.object['attachments'])
+            id_owner = str(event.object['attachments'][0]['photo']['owner_id'])
+            id_image = str(event.object['attachments'][0]['photo']['id'])
+            key = event.object['attachments'][0]['photo']['access_key']
+            id = id_owner + '_' + id_image + '_' + key
+            image = vk.photos.getById(photos="182293940_457246115")
+            print(image)'''
 
         if '@' in user_msg[0]:
             if len(user_msg) == 1:
@@ -47,6 +57,8 @@ for event in longpoll.listen():
             format: schedule [day] (optionally)
         '''
         if user_msg[0] in ['sh', 'schedule']:
+            # получение расписания
+            day = None
             if len(user_msg) > 1 and user_msg[1].isdigit():
                 day = int(user_msg[1])
                 if day >= 7:
@@ -58,8 +70,20 @@ for event in longpoll.listen():
                     day = 1
                 cursor.execute(f'select lessons from schedule where id="{day}"')
             data = eval(cursor.fetchall()[0][0])
+            # получение ДЗ
+
+            if not day:
+                day = datetime.isoweekday(date.today()) + 1
+            cursor.execute(f'select hw from days where id="{day}"')
+            hw = cursor.fetchall()
+            if hw:
+                hw = "\nДомашка:\n" + hw[0][0]
+            else:
+                hw = '\nДомашка:\nнеизвестно'
+            # отправка
             schedule = "\n".join(data)
-            send_msg(schedule)
+
+            send_msg(schedule + hw)
         '''
             add static schedule // добавить постоянное расписание
             format: addschedule [day of week] <list of subjects>
@@ -78,7 +102,7 @@ for event in longpoll.listen():
                     if cursor.fetchall():
                         cursor.execute(f'update schedule set lessons="{str(lessons)}" where id="{id_day}"')
                     else:
-                        cursor.execute(f'insert into schedule values("{id_day}", "{str(lessons)}")')
+                        cursor.execute(f'in sert into schedule values("{id_day}", "{str(lessons)}")')
                         conn.commit()
                     schedule_now = "\n".join(lessons) + "\nDone"
                     send_msg(schedule_now)
@@ -91,10 +115,23 @@ for event in longpoll.listen():
                     [subject]: [homework]
         '''
         if user_msg[0] in ['addhw', 'addhomework', 'ah']:
-            # date: 'dd.mm'
+            # day: 1-6
             # subject: 'subject name'
             # homework: 'description of homework'
-            pass
+            day = user_msg[1]
+            if day.isdigit():
+                day = int(day)
+                if day >= 1 or day <= 6:
+                    text = " ".join(user_msg[2::])
+                    if len(text) < 400:
+                        print(144, day, text)
+                        cursor.execute(f'insert into days values ("{day}", "schedule", "{text}")')
+                        conn.commit()
+                        send_msg('Done')
+                    else:
+                        send_msg("ты гей")
+            else:
+                send_msg("ты гей")
 
         '''
             show help // показать помощь
