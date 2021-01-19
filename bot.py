@@ -138,7 +138,17 @@ for event in longpoll.listen():
             # day: 1-6
             # subject: 'subject name'
             # homework: 'description of homework'
-            day = user_msg[1]
+            user_msg = event.object['text'].split('\n')
+            user_msg[0] = ' '.join(user_msg[0].split()[2:])
+            kucha = ''
+            for i in user_msg:
+                i = i.split()
+                if i[0] not in subjects_list:
+                    kucha += ' '.join(i) + '\n'
+                subject = i[0]
+                subj_hw = ' '.join(i[1:])
+
+            '''day = user_msg[1]
             if day.isdigit():
                 day = int(day)
                 if day >= 1 or day <= 6:
@@ -155,7 +165,7 @@ for event in longpoll.listen():
                     else:
                         send_msg("ты гей")
             else:
-                send_msg("ты гей")
+                send_msg("ты гей")'''
 
         '''
             show help // показать помощь
