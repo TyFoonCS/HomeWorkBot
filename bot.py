@@ -20,7 +20,7 @@ pin_now = "1488"
 empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
 subjects_list = [
     "алгебра", "биология", "история", "обществознание", "география", "программирование", "английский", "информатика",
-    "мп", "физ-ра", "геометрия", "химия", "литература", "астрономия", "русский", "физика", "обж", "ПОУ", "ТПНС"
+    "мп", "физ-ра", "геометрия", "химия", "литература", "астрономия", "русский", "физика", "обж", "поу", "тпнс"
 ]
 day_name = {
     "пн": 1,
@@ -103,7 +103,11 @@ for event in longpoll.listen():
                 if day >= 7:
                     day = 1
                 cursor.execute(f'select hw from days where id="{day}"')
-            data = cursor.fetchall()[0][0]
+            data = cursor.fetchall()[0][0].split('\n')
+            for n, i in enumerate(data):
+                if i == 'Остальное ДЗ:':
+                    break
+                data[n] = str(n + 1) + '. ' + data[n]
             # получение ДЗ
 
             '''if not day:
@@ -117,7 +121,7 @@ for event in longpoll.listen():
             # отправка
             schedule = "\n".join(data)'''
 
-            send_msg(data)
+            send_msg('\n'.join(data))
 
             vk.messages.pin(peer_id=event.object['peer_id'],
                             conversation_message_id=next_botmsg_id)
@@ -180,7 +184,7 @@ for event in longpoll.listen():
                     cursor.execute(f'select hw from days where id="{day}"')
                     old = cursor.fetchall()[0][0].split('\n')
                     kucha_old_index = old.index("Остальное ДЗ:")
-                    kucha_old = '\n'.join(old[kucha_old_index+1:]) + '\n'
+                    kucha_old = '\n'.join(old[kucha_old_index + 1:]) + '\n'
                     print(12222, kucha_old)
 
                 cursor.execute(f'select lessons from schedule where id="{day}"')
@@ -195,15 +199,13 @@ for event in longpoll.listen():
                         kucha += ' '.join(i) + '\n'
                         continue
                     subject = i[0].capitalize()
-                    subject_hw = subject + ' ' + ' '.join(i[1:])
+                    subject_hw = subject + ' - ' + ' '.join(i[1:])
                     text = text.replace(subject, subject_hw)
                 text += '\nОстальное ДЗ:\n' + kucha_old + kucha
                 print(777, text)
                 cursor.execute(f'update days set hw="{text}" where id="{day}"')
                 conn.commit()
                 send_msg("Записано")
-
-
 
             '''day = user_msg[1]
             if day.isdigit():
