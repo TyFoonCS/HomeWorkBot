@@ -21,8 +21,8 @@ empty_req_answers = ("Что надо?", "Звали?", "Доброго врем
 
 
 def send_msg(msg):
-    vk.messages.send(
-        peer_id=event.object['peer_id'],
+    return vk.messages.send(
+        peer_ids=event.object['peer_id'],
         random_id=random.random(),
         message=msg
     )
@@ -36,7 +36,23 @@ for event in longpoll.listen():
 
         user_msg = event.object['text'].split()
 
+        next_botmsg_id = int(event.object['conversation_message_id']) + 1
+        # admin_id = vk.messages.getConversationMembers(peer_id=event.object['peer_id'],
+        #                                               fields=event.object['from_id'])
+        # print(admin_id)
+
+        # vk.messages.edit(peer_id=event.object['peer_id'],
+        #                 message='Working ebat',
+        #                 conversation_message_id=next_msg_id)
+
         '''if event.object['attachments']:
+            print(event.object['attachments'])
+            attach = ''
+            for i in event.object['attachments']:
+                attach += i['type']
+                attach_obj = i[i['type']]
+                attach += str(attach_obj['owner_id']) + '_' + str(attach_obj['id']) + ('_' + attach_obj['access_key']) if attach_obj['access_key'] else '' + ','
+            print(attach)
             print(12, event.object['attachments'])
             id_owner = str(event.object['attachments'][0]['photo']['owner_id'])
             id_image = str(event.object['attachments'][0]['photo']['id'])
@@ -84,6 +100,10 @@ for event in longpoll.listen():
             schedule = "\n".join(data)
 
             send_msg(schedule + hw)
+
+            vk.messages.pin(peer_id=event.object['peer_id'],
+                            conversation_message_id=next_botmsg_id)
+
         '''
             add static schedule // добавить постоянное расписание
             format: addschedule [day of week] <list of subjects>
@@ -148,8 +168,6 @@ for event in longpoll.listen():
                     - показывает расписание на завтрашний день и закрепляет в беседе, или на определенную дату (опционально), можно sh
                 addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
                     - добавляет постоянное расписание на определенный день недели (по умолчанию на следующий учебный день)
-                updateschedule [дата в формате дд.мм] <список предметов через запятую>
-                    - изменить расписание на определенную дату (по умолчанию на следующий учебный день), можно us
                 addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
                     - добавить или изменить задание на определенную дату (по умолчанию на следующий учебный день), можно addhw, ah
                 commands
