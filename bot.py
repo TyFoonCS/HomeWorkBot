@@ -18,10 +18,12 @@ conn, cursor = db("testdb")
 
 pin_now = "1488"
 empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
+
 subjects_list = [
     "алгебра", "биология", "история", "обществознание", "география", "программирование", "английский", "информатика",
     "мп", "физ-ра", "геометрия", "химия", "литература", "астрономия", "русский", "физика", "обж", "поу", "тпнс"
 ]
+
 day_name = {
     "пн": 1,
     "вт": 2,
@@ -49,6 +51,13 @@ def send_msg(msg):
 for event in longpoll.listen():
     print(event.object.keys())
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
+        user_msg = event.object['text'].split()
+        if '@' in user_msg[0]:
+            if len(user_msg) == 1:
+                send_msg(random.choice(empty_req_answers))
+                continue
+            user_msg = user_msg[1:]
+        print(user_msg)
 
         dialog_id = str(event.object['peer_id'])
         dialog_id_int = int(dialog_id)
@@ -65,7 +74,28 @@ for event in longpoll.listen():
             continue
         # -------------------------------
 
-        user_msg = event.object['text'].split()
+        # Проверка на заполнение списка предметов
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
+        fet = cursor.fetchall()
+        print(888888, user_msg[0])
+        if fet:
+            subjects_list = eval(fet[0][0])
+        elif user_msg[0] in ['lessons', 'ls']:
+            print(777777777777777777)
+            lessons_list = user_msg[1:]
+            cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
+            if cursor.fetchall():
+                cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}" where id=0')
+                conn.commit()
+                send_msg("Список предметов обновлен")
+            else:
+                cursor.execute(f'insert into {"sh" + dialog_id} values (0, "{lessons_list}")')
+                conn.commit()
+                send_msg("Список предметов добавлен")
+        else:
+            send_msg("У вас не заполнен список предметов. Заполните командой ls")
+            continue
+        # ---------------------------------------
 
         next_botmsg_id = int(event.object['conversation_message_id']) + 1
         # admin_id = vk.messages.getConversationMembers(peer_id=event.object['peer_id'],
@@ -91,13 +121,6 @@ for event in longpoll.listen():
             id = id_owner + '_' + id_image + '_' + key
             image = vk.photos.getById(photos="182293940_457246115")
             print(image)'''
-
-        if '@' in user_msg[0]:
-            if len(user_msg) == 1:
-                send_msg(random.choice(empty_req_answers))
-                continue
-            user_msg = user_msg[1:]
-        print(user_msg)
 
         ''' 
             show schedule // показать расписание с дз 
@@ -132,6 +155,7 @@ for event in longpoll.listen():
             else:
                 send_msg(
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                continue
 
         '''
             add static schedule // добавить постоянное расписание
@@ -220,6 +244,7 @@ for event in longpoll.listen():
                 else:
                     send_msg(
                         "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    continue
 
         '''
             Добавление списка всех предметов. (subjects_list)
@@ -229,8 +254,23 @@ for event in longpoll.listen():
             lessons_list = user_msg[1:]
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
             if cursor.fetchall():
-                cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}"')
+                cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}" where id=0')
                 conn.commit()
+                send_msg("Список предметов обновлен")
+            else:
+                cursor.execute(f'insert into {"sh" + dialog_id} values (0, "{lessons_list}")')
+                conn.commit()
+                send_msg("Список предметов добавлен")
+
+        '''
+            Просмотр списка всех прдеметов. (subjects_list)
+            format: list
+        '''
+        if user_msg[0] in ['list']:
+            l = str()
+            for i in subjects_list:
+                l += ' ' + i
+            send_msg(l)
 
         '''
             show help // показать помощь
