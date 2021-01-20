@@ -37,6 +37,12 @@ day_name = {
     "четверг": 4,
     "пятница": 5,
     "суббота": 6,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
 }
 
 
@@ -80,7 +86,7 @@ for event in longpoll.listen():
         print(888888, user_msg[0])
         if fet:
             subjects_list = eval(fet[0][0])
-        elif user_msg[0] in ['lessons', 'ls']:
+        elif user_msg[0] in ['lessons', 'ls', 'предметы']:
             print(777777777777777777)
             lessons_list = user_msg[1:]
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
@@ -126,7 +132,7 @@ for event in longpoll.listen():
             show schedule // показать расписание с дз 
             format: schedule [day] (optionally)
         '''
-        if user_msg[0] in ['sh', 'schedule']:
+        if user_msg[0] in ['sh', 'schedule', 'расписание', 'рп']:
             # получение расписания
             day = None
             if len(user_msg) > 1 and user_msg[1].isdigit():
@@ -161,7 +167,7 @@ for event in longpoll.listen():
             add static schedule // добавить постоянное расписание
             format: addschedule [day of week] <list of subjects>
         '''
-        if user_msg[0] in ['addschedule']:
+        if user_msg[0] in ['addschedule', 'уроки']:
             # day of week: day id(1-7)
             # pin for change
             # list of subjects: 'subject name' by ' '
@@ -187,7 +193,7 @@ for event in longpoll.listen():
             format: addhomework [date](optionally)
                     [subject]: [homework]
         '''
-        if user_msg[0] in ['addhw', 'addhomework', 'ah']:
+        if user_msg[0] in ['addhw', 'addhomework', 'ah', 'дз']:
             # day: пн-сб
             # subject: 'subject name'
             # homework: 'description of homework'
@@ -215,7 +221,7 @@ for event in longpoll.listen():
                 if now_day < day or now_day == 7:
                     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
                     old = cursor.fetchall()[0][0].split('\n')
-                    if len(old) > 2:
+                    if len(old) > 5:
                         kucha_old_index = old.index("Остальное ДЗ:")
                         kucha_old = '\n'.join(old[kucha_old_index + 1:]) + '\n'
                         print(12222, kucha_old)
@@ -250,7 +256,7 @@ for event in longpoll.listen():
             Добавление списка всех предметов. (subjects_list)
             format: ls [subject1] [subject2] ... [subjectN]
         '''
-        if user_msg[0] in ['lessons', 'ls']:
+        if user_msg[0] in ['lessons', 'ls', 'предметы']:
             lessons_list = user_msg[1:]
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
             if cursor.fetchall():
@@ -275,32 +281,14 @@ for event in longpoll.listen():
         '''
             show help // показать помощь
         '''
-        if user_msg[0] in ['help']:
+        if user_msg[0] in ['help', 'помощь']:
             send_msg(
-                '''К боту в беседе нужно обращаться через @hosbobot
-                Примеры команд можете посмотреть в обсуждениях группы
-                schedule [дата в формате дд.мм]
-                    - показывает расписание на завтрашний день и закрепляет в беседе, или на определенную дату (опционально), можно sh
-                addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
-                    - добавляет постоянное расписание на определенный день недели (по умолчанию на следующий учебный день)
-                addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
-                    - добавить или изменить задание на определенную дату (по умолчанию на следующий учебный день), можно addhw, ah
-                commands
-                    - показать список команд, cm
-                help
-                    - показать помощь
-                '''
-            )
-
-        '''
-            show commands // показать команды
-        '''
-        if user_msg[0] in ['commands', 'cm']:
-            send_msg(
-                '''schedule [дата в формате дд.мм]
-                addsсhedule [день недели типа "Понедельник"] <список предметов через запятую>
-                addhomework [дата в формате дд.мм] <список заданий по предметам на каждой строке, [предмет]: [задание]>
-                commands
-                help
+                '''Команды и примеры:
+                https://vk.com/topic-200162959_46878569
+                предметы <список предметов через пробел>
+                расписание [день]
+                уроки [день] <список предметов через пробел>
+                дз [день] <дз>
+                help, помощь
                 '''
             )
