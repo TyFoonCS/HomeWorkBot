@@ -61,6 +61,12 @@ for event in longpoll.listen():
         if event.object['from_id'] in [167849130]:
             god = True
 
+        #изменение сообщения с перехватом ошибки по истечении 24 часов после отправки
+        '''try:
+            vk.messages.edit()
+        except vk_api.exceptions.ApiError as exc:
+            if str(exc).split()[0][1:-1] == '900':'''
+
         user_msg = event.object['text'].split()
 
         if '@' in user_msg[0]:
@@ -157,13 +163,11 @@ for event in longpoll.listen():
                 data = eval(data[0][0])
 
                 text = ''
-                i = 1
-                for key in data.keys():
+                for i, key in enumerate(data.keys()):
                     if key == 'kucha':
                         text += 'Остальное ДЗ:\n' + data[key]
                         continue
-                    text += str(i) + '. ' + key + ': ' + data[key] + '\n'
-                    i += 1
+                    text += str(i+1) + '. ' + key + ': ' + data[key] + '\n'
 
                 send_msg(text)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
@@ -204,7 +208,7 @@ for event in longpoll.listen():
             # на случай пустого собщения после команды
             if len(user_msg) > 1:
                 user_msg_text = event.object['text'].split('\n')
-                user_msg_text[0] = ' '.join(user_msg_text[0].split()[1:])
+                user_msg_text[0] = ' '.join(user_msg_text[0].split()[(2 if user_msg_text[0].split()[1] in day_name.keys() else 1):])
                 kucha = ''
                 subject = ''
 
@@ -234,7 +238,7 @@ for event in longpoll.listen():
                         "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
                     continue
 
-        if user_msg[0] in ['updatehomework', 'uh', 'дополнить']:
+        if user_msg[0] in ['updatehomework', 'uh', 'допдз']:
 
             if len(user_msg) > 1:
                 user_msg_text = event.object['text'].split('\n')
@@ -303,6 +307,7 @@ for event in longpoll.listen():
                 расписание [день]
                 уроки [день] <список предметов через пробел>
                 дз [день] <дз>
+                допдз [день] <дз>
                 help, помощь
                 '''
             )
