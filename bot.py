@@ -1,6 +1,7 @@
 import requests
 import random
 import vk_api
+import pytz
 from datetime import datetime, date
 from MyLongPoll import MyVkLongPoll
 from data import db
@@ -61,11 +62,23 @@ for event in longpoll.listen():
             god = True
 
         user_msg = event.object['text'].split()
+
         if '@' in user_msg[0]:
             if len(user_msg) == 1:
                 send_msg(random.choice(empty_req_answers))
                 continue
             user_msg = user_msg[1:]
+
+        # определение дня
+        day = datetime.isoweekday(datetime.now(pytz.timezone('Asia/Dubai'))) + 1
+        if len(user_msg) > 1:
+            if user_msg[1] in day_name.keys():
+                day = int(day_name[user_msg[1]])
+                del user_msg[1]
+        print("DAAAAAAAAAAAAAY", day)
+        if day == 7:
+            day = 1
+
         print(user_msg)
 
         dialog_id = str(event.object['peer_id'])
@@ -86,7 +99,6 @@ for event in longpoll.listen():
         # Проверка на заполнение списка предметов
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
         fet = cursor.fetchall()
-        print(888888, user_msg[0])
         if fet:
             subjects_list = eval(fet[0][0])
         elif user_msg[0] in ['lessons', 'ls', 'предметы']:
@@ -137,17 +149,7 @@ for event in longpoll.listen():
         '''
         if user_msg[0] in ['sh', 'schedule', 'расписание', 'рп']:
             # получение расписания
-            day = None
-            if len(user_msg) > 1 and user_msg[1].isdigit():
-                day = int(user_msg[1])
-                if day >= 7:
-                    day = 1
-                cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-            else:
-                day = datetime.isoweekday(date.today()) + 1
-                if day >= 7:
-                    day = 1
-                cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
 
             data = cursor.fetchall()
             if data:
@@ -174,17 +176,13 @@ for event in longpoll.listen():
             # day of week: day id(1-7)
             # pin for change
             # list of subjects: 'subject name' by ' '
-
-            id_day = int(user_msg[1])
-            if id_day < 1 or id_day > 6:
-                send_msg(f"Воу-воу, палехче! Учебных дней шесть, а не {id_day}")
-            else:
+            if len(user_msg) > 2:
                 lessons = user_msg[3:]
-                cursor.execute(f'select * from {"sh" + dialog_id} where id="{id_day}"')
+                cursor.execute(f'select * from {"sh" + dialog_id} where id="{day}"')
                 if cursor.fetchall():
-                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{id_day}"')
+                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{day}"')
                 else:
-                    cursor.execute(f'insert into {"sh" + dialog_id} values("{id_day}", "{str(lessons)}")')
+                    cursor.execute(f'insert into {"sh" + dialog_id} values("{day}", "{str(lessons)}")')
                     conn.commit()
                 schedule_now = "\n".join(lessons) + "\nDone"
                 send_msg(schedule_now)
@@ -198,18 +196,9 @@ for event in longpoll.listen():
             # day: пн-сб
             # subject: 'subject name'
             # homework: 'description of homework'
-            day = None
 
             # на случай пустого собщения после команды
             if len(user_msg) > 1:
-                # определение дня для записи
-                if user_msg[1] in day_name.keys():
-                    day = day_name[user_msg[1]]
-                else:
-                    day = datetime.isoweekday(date.today()) + 1
-                    if day == 7:
-                        day = 1
-
                 user_msg = event.object['text'].split('\n')
                 user_msg[0] = ' '.join(user_msg[0].split()[2:])
                 kucha = ''
