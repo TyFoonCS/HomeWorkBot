@@ -16,7 +16,6 @@ longpoll = MyVkLongPoll(vk_session, "200162959")
 # longpoll = VkBotLongPoll(vk_session, "200162959")
 conn, cursor = db("testdb")
 
-pin_now = "1488"
 empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
 
 subjects_list = [
@@ -57,6 +56,10 @@ def send_msg(msg):
 for event in longpoll.listen():
     print(event.object.keys())
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
+        god = False
+        if event.object['from_id'] in [167849130]:
+            god = True
+
         user_msg = event.object['text'].split()
         if '@' in user_msg[0]:
             if len(user_msg) == 1:
@@ -171,22 +174,20 @@ for event in longpoll.listen():
             # day of week: day id(1-7)
             # pin for change
             # list of subjects: 'subject name' by ' '
-            if user_msg[1] == pin_now:
-                id_day = int(user_msg[2])
-                if id_day < 1 or id_day > 6:
-                    send_msg(f"Воу-воу, палехче! Учебных дней шесть, а не {id_day}")
-                else:
-                    lessons = user_msg[3:]
-                    cursor.execute(f'select * from {"sh" + dialog_id} where id="{id_day}"')
-                    if cursor.fetchall():
-                        cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{id_day}"')
-                    else:
-                        cursor.execute(f'insert into {"sh" + dialog_id} values("{id_day}", "{str(lessons)}")')
-                        conn.commit()
-                    schedule_now = "\n".join(lessons) + "\nDone"
-                    send_msg(schedule_now)
+
+            id_day = int(user_msg[1])
+            if id_day < 1 or id_day > 6:
+                send_msg(f"Воу-воу, палехче! Учебных дней шесть, а не {id_day}")
             else:
-                send_msg("Тебе так делать нельзя, фу!")
+                lessons = user_msg[3:]
+                cursor.execute(f'select * from {"sh" + dialog_id} where id="{id_day}"')
+                if cursor.fetchall():
+                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{id_day}"')
+                else:
+                    cursor.execute(f'insert into {"sh" + dialog_id} values("{id_day}", "{str(lessons)}")')
+                    conn.commit()
+                schedule_now = "\n".join(lessons) + "\nDone"
+                send_msg(schedule_now)
 
         '''
             add homework for specific date // добавить дз на определенную дату
