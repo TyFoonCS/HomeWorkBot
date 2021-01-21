@@ -153,16 +153,20 @@ for event in longpoll.listen():
 
             data = cursor.fetchall()
             if data:
-                data = data[0][0].split('\n')
-                for n, i in enumerate(data):
-                    if i == 'Остальное ДЗ:':
-                        break
-                    data[n] = str(n + 1) + '. ' + data[n]
+                print("data", data)
+                data = eval(data[0][0])
 
-                send_msg('\n'.join(data))
+                text = ''
+                i = 1
+                for key in data.keys():
+                    if key == 'kucha':
+                        text += 'Остальное ДЗ:\n' + data[key]
+                        continue
+                    text += str(i) + '. ' + key + ': ' + data[key] + '\n'
+                    i += 1
 
-                vk.messages.pin(peer_id=event.object['peer_id'],
-                                conversation_message_id=next_botmsg_id)
+                send_msg(text)
+                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
             else:
                 send_msg(
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
@@ -207,23 +211,26 @@ for event in longpoll.listen():
                 subject_hw = ''
 
                 # Уточнение - был ли уже выбранный учебный день на этой неделе
-                now_day = datetime.isoweekday(date.today())
+                '''now_day = datetime.isoweekday(date.today())
                 if now_day < day or now_day == 7:
                     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
                     old = cursor.fetchall()[0][0].split('\n')
                     if len(old) > 5:
                         kucha_old_index = old.index("Остальное ДЗ:")
                         kucha_old = '\n'.join(old[kucha_old_index + 1:]) + '\n'
-                        print(12222, kucha_old)
+                        print(12222, kucha_old)'''
                 # ------------------------------------------------------------
 
                 cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                lessons = cursor.fetchall()
-                if lessons:
-                    lessons = eval(lessons[0][0])
-                    text = '\n'.join(lessons)
+                lessons_l = cursor.fetchall()
+                if lessons_l:
+                    lessons_l = eval(lessons_l[0][0])
+                    lessons = dict()
+                    for les in lessons_l:
+                        lessons[les] = ''
+                    lessons['kucha'] = ''
 
-                    for i in user_msg:
+                    '''for i in user_msg:
                         i = i.split()
                         print(888, i)
                         if i[0].lower() not in subjects_list:
@@ -233,8 +240,79 @@ for event in longpoll.listen():
                         subject_hw = subject + ' - ' + ' '.join(i[1:])
                         text = text.replace(subject, subject_hw)
                     text += '\nОстальное ДЗ:\n' + kucha_old + kucha
-                    print(777, text)
-                    cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
+                    print(777, text)'''
+
+                    for i in user_msg:
+                        i = i.split()
+                        print("i", i)
+                        if i[0].lower() not in subjects_list:
+                            kucha += ' '.join(i) + '\n'
+                            continue
+                        subject = i[0].capitalize()
+                        lessons[subject] = ''.join(i[1:])
+                    lessons['kucha'] = kucha
+                    print("dict", lessons)
+                    cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
+                    conn.commit()
+                    send_msg("Записано")
+                else:
+                    send_msg(
+                        "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    continue
+
+        if user_msg[0] in ['updatehomework', 'uh', 'дополнить']:
+
+            if len(user_msg) > 1:
+                user_msg = event.object['text'].split('\n')
+                user_msg[0] = ' '.join(user_msg[0].split()[2:])
+                kucha = ''
+                kucha_old = ''
+                subject = ''
+                subject_hw = ''
+
+                # Уточнение - был ли уже выбранный учебный день на этой неделе
+                '''now_day = datetime.isoweekday(date.today())
+                if now_day < day or now_day == 7:
+                    cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+                    old = cursor.fetchall()[0][0].split('\n')
+                    if len(old) > 5:
+                        kucha_old_index = old.index("Остальное ДЗ:")
+                        kucha_old = '\n'.join(old[kucha_old_index + 1:]) + '\n'
+                        print(12222, kucha_old)'''
+                # ------------------------------------------------------------
+
+                cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                lessons_l = cursor.fetchall()
+                if lessons_l:
+                    lessons_l = eval(lessons_l[0][0])
+                    lessons = dict()
+                    for les in lessons_l:
+                        lessons[les] = ''
+                    lessons['kucha'] = ''
+
+                    '''for i in user_msg:
+                        i = i.split()
+                        print(888, i)
+                        if i[0].lower() not in subjects_list:
+                            kucha += ' '.join(i) + '\n'
+                            continue
+                        subject = i[0].capitalize()
+                        subject_hw = subject + ' - ' + ' '.join(i[1:])
+                        text = text.replace(subject, subject_hw)
+                    text += '\nОстальное ДЗ:\n' + kucha_old + kucha
+                    print(777, text)'''
+
+                    for i in user_msg:
+                        i = i.split()
+                        print("i", i)
+                        if i[0].lower() not in subjects_list:
+                            kucha += ' '.join(i) + '\n'
+                            continue
+                        subject = i[0].capitalize()
+                        lessons[subject] = ''.join(i[1:])
+                    lessons['kucha'] = kucha
+                    print("dict", lessons)
+                    cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                     conn.commit()
                     send_msg("Записано")
                 else:
