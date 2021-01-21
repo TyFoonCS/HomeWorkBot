@@ -257,7 +257,7 @@ for event in longpoll.listen():
             format: ls [subject1] [subject2] ... [subjectN]
         '''
         if user_msg[0] in ['lessons', 'ls', 'предметы']:
-            lessons_list = user_msg[1:]
+            lessons_list = [i.lower() for i in user_msg[1:]]
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
             if cursor.fetchall():
                 cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}" where id=0')
