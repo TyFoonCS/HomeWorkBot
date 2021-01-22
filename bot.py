@@ -123,6 +123,7 @@ for event in longpoll.listen():
                 cursor.execute(f'insert into {"sh" + dialog_id} values (0, "{lessons_list}")')
                 conn.commit()
                 send_msg("Список предметов добавлен")
+            continue
         else:
             send_msg("У вас не заполнен список предметов. Заполните командой ls")
             continue
@@ -153,6 +154,14 @@ for event in longpoll.listen():
 
                 send_msg(text)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
+                cursor.execute(f'select * from sh{dialog_id} where id=-1')
+                if cursor.fetchall():
+                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
+                    conn.commit()
+                else:
+                    cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
+                    conn.commit()
+                continue
             else:
                 send_msg(
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
@@ -177,6 +186,7 @@ for event in longpoll.listen():
                     conn.commit()
                 schedule_now = "\n".join(lessons) + "\nDone"
                 send_msg(schedule_now)
+                continue
 
         '''
             add homework for specific date // перезаписать дз на урок (если есть день, то на него)
@@ -207,8 +217,8 @@ for event in longpoll.listen():
                     for les in lessons_l:
                         lessons[les] = ''
                     lessons['kucha'] = ''
-                    print(user_msg_text, 'ср')
-                    for i in user_msg_text:
+                    print(user_msg, 'ср')
+                    for i in user_msg:
                         i = i.split()
                         print("i", i)
                         if i[0].lower() not in subjects_list:
@@ -249,7 +259,7 @@ for event in longpoll.listen():
                 if lessons and schedule_now:
                     lessons = eval(lessons[0][0])
 
-                    for i in user_msg_text:
+                    for i in user_msg:
                         i = i.split()
                         print("i", i)
                         if i[0].lower() not in subjects_list:
@@ -291,6 +301,7 @@ for event in longpoll.listen():
             for i in subjects_list:
                 l += ' ' + i
             send_msg(l)
+            continue
 
         '''
             show help // показать помощь
