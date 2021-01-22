@@ -54,8 +54,29 @@ def send_msg(msg):
     )
 
 
+def sh_out(data):
+    print("data", data)
+    data = eval(data[0][0])
+    cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+    lessons = eval(cursor.fetchall()[0][0])
+
+    text = ''
+    for i, key in enumerate(lessons):
+        text += str(i + 1) + '. ' + key + ': ' + data[key] + '\n'
+    text += 'Остальное ДЗ:\n' + data['kucha']
+
+    send_msg(text)
+    vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
+    cursor.execute(f'select * from sh{dialog_id} where id=-1')
+    if cursor.fetchall():
+        cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
+        conn.commit()
+    else:
+        cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
+        conn.commit()
+
+
 for event in longpoll.listen():
-    print(event.object.keys())
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
 
         # godmode
@@ -79,10 +100,8 @@ for event in longpoll.listen():
 
         # определение дня
         day = datetime.isoweekday(datetime.now(pytz.timezone('Asia/Dubai'))) + 1
-        isDayGiven = False
         if len(user_msg[0]) > 1:
             if user_msg[0][1] in day_name.keys():
-                isDayGiven = True
                 day = int(day_name[user_msg[0][1]])
                 del user_msg[0][1]
         print("DAAAAAAAAAAAAAY", day)
@@ -112,7 +131,6 @@ for event in longpoll.listen():
         if fet:
             subjects_list = eval(fet[0][0])
         elif user_msg[0][0] in ['lessons', 'ls', 'предметы']:
-            print(777777777777777777)
             lessons_list = [i.lower() for i in user_msg[0][1:]]
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
             if cursor.fetchall():
@@ -142,25 +160,7 @@ for event in longpoll.listen():
             user_msg = user_msg[0]
             data = cursor.fetchall()
             if data:
-                print("data", data)
-                data = eval(data[0][0])
-
-                text = ''
-                for i, key in enumerate(data.keys()):
-                    if key == 'kucha':
-                        text += 'Остальное ДЗ:\n' + data[key]
-                        continue
-                    text += str(i+1) + '. ' + key + ': ' + data[key] + '\n'
-
-                send_msg(text)
-                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
-                cursor.execute(f'select * from sh{dialog_id} where id=-1')
-                if cursor.fetchall():
-                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
-                    conn.commit()
-                else:
-                    cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
-                    conn.commit()
+                sh_out(data)
                 continue
             else:
                 send_msg(
@@ -200,14 +200,7 @@ for event in longpoll.listen():
 
             # на случай пустого собщения после команды
             if len(user_msg[0]) > 1:
-                user_msg[0] = ' '.join(user_msg[0][(2 if isDayGiven else 1):])
-
-                # на урок
-                if not isDayGiven:
-                    pass
-                # в кучу
-                else:
-                    pass
+                user_msg[0] = ' '.join(user_msg[0][1:])
 
                 cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                 lessons_l = cursor.fetchall()
@@ -217,10 +210,10 @@ for event in longpoll.listen():
                     for les in lessons_l:
                         lessons[les] = ''
                     lessons['kucha'] = ''
-                    print(user_msg, 'ср')
+                    print(user_msg)
                     for i in user_msg:
                         i = i.split()
-                        print("i", i)
+                        print("i - ", i)
                         if i[0].lower() not in subjects_list:
                             lessons['kucha'] += ' '.join(i) + '\n'
                             continue
@@ -243,14 +236,7 @@ for event in longpoll.listen():
         if user_msg[0][0] in ['updatehomework', 'uh', 'допдз']:
 
             if len(user_msg[0]) > 1:
-                user_msg[0] = ' '.join(user_msg[0][(2 if isDayGiven else 1):])
-
-                # на урок
-                if not isDayGiven:
-                    pass
-                # в кучу
-                else:
-                    pass
+                user_msg[0] = ' '.join(user_msg[0][1:])
 
                 cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
                 lessons = cursor.fetchall()
@@ -293,7 +279,7 @@ for event in longpoll.listen():
                 send_msg("Список предметов добавлен")
 
         '''
-            Просмотр списка всех прдеметов. (subjects_list)
+            Просмотр списка всех предметов. (subjects_list)
             format: list
         '''
         if user_msg[0][0] in ['list']:
