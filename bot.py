@@ -64,12 +64,16 @@ def sh_out():
 
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         try:
+            print(7777)
             vk.messages.edit(peer_id=event.object['peer_id'],
                              message=text,
                              conversation_message_id=int(cursor.fetchall()[0][0]))
+            print(8888)
             send_msg("Отредачил закреп")
+            print(9999)
         except vk_api.exceptions.ApiError as exc:
-            if str(exc).split()[0][1:-1] in ('900', '15', '910', '914'):
+            print(exc)
+            if str(exc).split()[0][1:-1] in ('900', '15', '910', '914', '909'):
                 send_msg(text)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
                 cursor.execute(f'select * from sh{dialog_id} where id=-1')
@@ -80,12 +84,16 @@ def sh_out():
                     cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
                     conn.commit()
     else:
-        cursor.execute(f'select lessons from {"sh" + dialog_id}')
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
         schedule = cursor.fetchall()
-        if schedule and len(schedule) > 1:
+        print(schedule)
+        if schedule:
+            schedule = eval(schedule[0][0])
             text = ''
             for i, lesson in enumerate(schedule):
+                print(i, lesson)
                 text += str(i + 1) + '. ' + lesson + '\n'
+            send_msg(text)
         else:
             send_msg(
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
