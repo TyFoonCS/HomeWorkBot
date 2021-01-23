@@ -19,11 +19,6 @@ conn, cursor = db("testdb")
 
 empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
 
-subjects_list = [
-    "алгебра", "биология", "история", "обществознание", "география", "программирование", "английский", "информатика",
-    "мп", "физ-ра", "геометрия", "химия", "литература", "астрономия", "русский", "физика", "обж", "поу", "тпнс"
-]
-
 day_name = {
     "пн": 1,
     "вт": 2,
@@ -54,26 +49,46 @@ def send_msg(msg):
     )
 
 
-def sh_out(data):
-    print("data", data)
-    data = eval(data[0][0])
-    cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-    lessons = eval(cursor.fetchall()[0][0])
+def sh_out():
+    cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+    data = cursor.fetchall()
+    if data:
+        data = eval(data[0][0])
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+        lessons = eval(cursor.fetchall()[0][0])
+        print("data", data)
+        text = ''
+        for i, key in enumerate(lessons):
+            text += str(i + 1) + '. ' + key + ': ' + data[key] + '\n'
+        text += 'Остальное ДЗ:\n' + data['kucha']
 
-    text = ''
-    for i, key in enumerate(lessons):
-        text += str(i + 1) + '. ' + key + ': ' + data[key] + '\n'
-    text += 'Остальное ДЗ:\n' + data['kucha']
-
-    send_msg(text)
-    vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
-    cursor.execute(f'select * from sh{dialog_id} where id=-1')
-    if cursor.fetchall():
-        cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
-        conn.commit()
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
+        try:
+            vk.messages.edit(peer_id=event.object['peer_id'],
+                             message=text,
+                             conversation_message_id=int(cursor.fetchall()[0][0]))
+            send_msg("Отредачил закреп")
+        except vk_api.exceptions.ApiError as exc:
+            if str(exc).split()[0][1:-1] in ('900', '15', '910', '914'):
+                send_msg(text)
+                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
+                cursor.execute(f'select * from sh{dialog_id} where id=-1')
+                if cursor.fetchall():
+                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
+                    conn.commit()
+                else:
+                    cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
+                    conn.commit()
     else:
-        cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
-        conn.commit()
+        cursor.execute(f'select lessons from {"sh" + dialog_id}')
+        schedule = cursor.fetchall()
+        if schedule and len(schedule) > 1:
+            text = ''
+            for i, lesson in enumerate(schedule):
+                text += str(i + 1) + '. ' + lesson + '\n'
+        else:
+            send_msg(
+                "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 
 for event in longpoll.listen():
@@ -83,12 +98,6 @@ for event in longpoll.listen():
         god = False
         if event.object['from_id'] in [167849130]:
             god = True
-
-        # изменение сообщения с перехватом ошибки по истечении 24 часов после отправки
-        '''try:
-            vk.messages.edit()
-        except vk_api.exceptions.ApiError as exc:
-            if str(exc).split()[0][1:-1] == '900':  '''
 
         user_msg = event.object['text'].split('\n')
         user_msg[0] = user_msg[0].split()
@@ -104,11 +113,8 @@ for event in longpoll.listen():
             if user_msg[0][1] in day_name.keys():
                 day = int(day_name[user_msg[0][1]])
                 del user_msg[0][1]
-        print("DAAAAAAAAAAAAAY", day)
         if day == 7:
             day = 1
-
-        print(user_msg)
 
         dialog_id = str(event.object['peer_id'])
         dialog_id_int = int(dialog_id)
@@ -125,28 +131,6 @@ for event in longpoll.listen():
             continue
         # -------------------------------
 
-        # Проверка на заполнение списка предметов
-        cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
-        fet = cursor.fetchall()
-        if fet:
-            subjects_list = eval(fet[0][0])
-        elif user_msg[0][0] in ['lessons', 'ls', 'предметы']:
-            lessons_list = [i.lower() for i in user_msg[0][1:]]
-            cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
-            if cursor.fetchall():
-                cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}" where id=0')
-                conn.commit()
-                send_msg("Список предметов обновлен")
-            else:
-                cursor.execute(f'insert into {"sh" + dialog_id} values (0, "{lessons_list}")')
-                conn.commit()
-                send_msg("Список предметов добавлен")
-            continue
-        else:
-            send_msg("У вас не заполнен список предметов. Заполните командой ls")
-            continue
-        # ---------------------------------------
-
         next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
         ''' 
@@ -154,18 +138,8 @@ for event in longpoll.listen():
             format: schedule [day] (optionally)
         '''
         if user_msg[0][0] in ['sh', 'schedule', 'расписание', 'рп']:
-            # получение расписания
-            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-
-            user_msg = user_msg[0]
-            data = cursor.fetchall()
-            if data:
-                sh_out(data)
-                continue
-            else:
-                send_msg(
-                    "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
-                continue
+            sh_out()
+            continue
 
         '''
             add static schedule // добавить постоянное расписание
@@ -177,7 +151,7 @@ for event in longpoll.listen():
             # list of subjects: 'subject name' by ' '
             user_msg = user_msg[0]
             if len(user_msg) > 2:
-                lessons = user_msg[3:]
+                lessons = [i.capitalize() for i in user_msg[1:]]
                 cursor.execute(f'select * from {"sh" + dialog_id} where id="{day}"')
                 if cursor.fetchall():
                     cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{day}"')
@@ -213,16 +187,20 @@ for event in longpoll.listen():
                     print(user_msg)
                     for i in user_msg:
                         i = i.split()
-                        print("i - ", i)
-                        if i[0].lower() not in subjects_list:
+                        print("i", i)
+                        if i[0].capitalize() not in lessons_l:
                             lessons['kucha'] += ' '.join(i) + '\n'
                             continue
                         subject = i[0].capitalize()
-                        lessons[subject] = ''.join(i[1:])
+                        lessons[subject] += ' ' + ''.join(i[1:])
                     print("dict", lessons)
-                    cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
-                    conn.commit()
-                    send_msg("Записано")
+                    cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+                    if cursor.fetchall():
+                        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
+                        conn.commit()
+                    else:
+                        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(lessons)}")')
+                    sh_out()
                 else:
                     send_msg(
                         "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
@@ -248,7 +226,7 @@ for event in longpoll.listen():
                     for i in user_msg:
                         i = i.split()
                         print("i", i)
-                        if i[0].lower() not in subjects_list:
+                        if i[0].capitalize() not in lessons_l:
                             lessons['kucha'] += ' '.join(i) + '\n'
                             continue
                         subject = i[0].capitalize()
@@ -256,38 +234,11 @@ for event in longpoll.listen():
                     print("dict", lessons)
                     cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                     conn.commit()
-                    send_msg("Записано")
+                    sh_out()
                 else:
                     send_msg(
                         "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
                     continue
-
-        '''
-            Добавление списка всех предметов. (subjects_list)
-            format: ls [subject1] [subject2] ... [subjectN]
-        '''
-        if user_msg[0][0] in ['lessons', 'ls', 'предметы']:
-            lessons_list = [i.lower() for i in user_msg[0][1:]]
-            cursor.execute(f'select lessons from {"sh" + dialog_id} where id=0')
-            if cursor.fetchall():
-                cursor.execute(f'update {"sh" + dialog_id} set lessons="{lessons_list}" where id=0')
-                conn.commit()
-                send_msg("Список предметов обновлен")
-            else:
-                cursor.execute(f'insert into {"sh" + dialog_id} values (0, "{lessons_list}")')
-                conn.commit()
-                send_msg("Список предметов добавлен")
-
-        '''
-            Просмотр списка всех предметов. (subjects_list)
-            format: list
-        '''
-        if user_msg[0][0] in ['list']:
-            l = str()
-            for i in subjects_list:
-                l += ' ' + i
-            send_msg(l)
-            continue
 
         '''
             show help // показать помощь
