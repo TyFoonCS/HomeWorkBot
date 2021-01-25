@@ -79,6 +79,7 @@ def sh_out():
         for k in kuchka:
             text += k + '\n'
 
+
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
         try:
@@ -118,14 +119,13 @@ def sh_out():
             send_msg(
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
-
 def add_hw(user_msg, day, lessons_l):
     lessons_l = eval(lessons_l[0]['lessons'])
     lessons = dict()
     for les in lessons_l:
         lessons[les] = ''
     lessons['kucha'] = ''
-    print(user_msg)
+    print("usg: ", user_msg)
     for i in user_msg:
         i = i.split()
         print("i", i)
@@ -211,13 +211,13 @@ for event in longpoll.listen():
                     cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{day}"')
                     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
                     if cursor.fetchall():
-                        if len(user_msg[0]) > 1:
-                            user_msg[0] = ' '.join(user_msg[0][1:])
+                        if len(user_msg) > 1:
+                            # user_msg[0] = ' '.join(user_msg[0][1:])
                             # user_msg.append('-')
                             cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                             lessons_l = cursor.fetchall()
                             if lessons_l:
-                                text = add_hw(user_msg, day, lessons_l)
+                                text = add_hw(user_msg[1:], day, lessons_l)
                         cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
                 else:
                     cursor.execute(f'insert into {"sh" + dialog_id} values("{day}", "{str(lessons)}")')
