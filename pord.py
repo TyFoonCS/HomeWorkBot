@@ -133,28 +133,49 @@ def sh_out():
 
 def add_hw(user_msg, day, lessons_l):
     lessons_l = eval(lessons_l[0]['lessons'])
-    lessons = dict()
-    for les in lessons_l:
-        lessons[les] = ''
-    lessons['kucha'] = ''
-    print("usg: ", user_msg)
-    for i in user_msg:
-        i = i.split()
-        print("i", i)
-        if i[0].capitalize() not in lessons_l:
-            lessons['kucha'] += ' '.join(i) + '-i-'
-            continue
-        subject = i[0].capitalize()
-        lessons[subject] += ' '.join(i[1:])
-    print("dict", lessons)
+
     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-    if cursor.fetchall():
-        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
+    now_hw = cursor.fetchall()
+    if now_hw:
+        hw = eval(now_hw[0]['hw'])
+    else:
+        hw = dict()
+        for key in lessons_l:
+            hw[key] = ''
+        hw['kucha'] = ''
+
+    for words in user_msg:
+        words = words.split()
+        print('words: ', words)
+        if words[0].capitalize() not in lessons_l:
+            hw['kucha'] = ' '.join(words) + '-i-'
+            continue
+        subject = words[0].capitalize()
+        hw[subject] = ' '.join(words[1:])
+
+    if now_hw:
+        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(hw)}" where id="{day}"')
         conn.commit()
     else:
-        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(lessons)}")')
+        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(hw)}")')
         conn.commit()
-    return str(lessons)
+    return str(hw)
+
+
+def clean(day, lessons_l):
+    lessons_l = eval(lessons_l[0]['lessons'])
+    hw = dict()
+    for key in lessons_l:
+        hw[key] = ''
+    hw['kucha'] = ''
+
+    cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+    if cursor.fetchall():
+        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(hw)}" where id="{day}"')
+        conn.commit()
+    else:
+        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(hw)}")')
+        conn.commit()
 
 
 for event in longpoll.listen():
@@ -277,6 +298,8 @@ for event in longpoll.listen():
                     if lessons_l:
                         add_hw(user_msg, day, lessons_l)
                         sh_out()
+                        conn.close()
+                        continue
                     else:
                         send_msg(
                             "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
@@ -312,11 +335,25 @@ for event in longpoll.listen():
                         cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                         conn.commit()
                         sh_out()
+                        conn.close()
+                        continue
                     else:
                         send_msg(
                             "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу). Также возможны никто еще не заполнял первичное ДЗ командой дз, таким образом вам нечего дополнять.")
                         conn.close()
                         continue
+
+            if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть'):
+                cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                lessons_l = cursor.fetchall()
+                if lessons_l:
+                    clean(day, lessons_l)
+                    sh_out()
+                else:
+                    send_msg(
+                        "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    conn.close()
+                    continue
 
             '''
                 show help // показать помощь
@@ -325,11 +362,13 @@ for event in longpoll.listen():
                 send_msg(
                     '''Команды и примеры:
                     https://vk.com/topic-200162959_46878569
+                    !День вводить необязательно!
                     предметы <список предметов через пробел>
                     расписание [день]
                     уроки [день] <список предметов через пробел>
                     дз [день] <дз>
                     доп [день] <дз>
+                    стереть [день]
                     help, помощь
                     '''
                 )

@@ -1,1 +1,0 @@
-create table sh<peer_id>(id integer, lessons text)
