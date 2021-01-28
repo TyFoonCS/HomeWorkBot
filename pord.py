@@ -97,6 +97,7 @@ def sh_out():
                 vk.messages.edit(peer_id=event.object['peer_id'],
                                  message=text,
                                  conversation_message_id=int(conv[0]['lessons']))
+                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=conv[0]['lessons'])
                 send_msg("Отредачил закреп")
                 print(9999)
             except Exception as exc:
