@@ -155,13 +155,14 @@ def add_hw(user_msg, day, lessons_l):
         subject = words[0].capitalize()
         hw[subject] = ' '.join(words[1:])
 
+    hw = str(hw).replace("'", r"\'").replace('"', r'\"')
     if now_hw:
-        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(hw)}" where id="{day}"')
+        cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
         conn.commit()
     else:
-        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(hw)}")')
+        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
         conn.commit()
-    return str(hw)
+    return hw
 
 
 def clean(day, lessons_l):
@@ -334,6 +335,7 @@ for event in longpoll.listen():
                             subject = i[0].capitalize()
                             lessons[subject] += ' '.join(i[1:])
                         print("dict", lessons)
+                        lessons = str(lessons).replace("'", r"\'").replace('"', r'\"')
                         cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                         conn.commit()
                         sh_out()
