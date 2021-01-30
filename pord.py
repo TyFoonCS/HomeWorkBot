@@ -90,7 +90,8 @@ def sh_out():
 
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
-        if day == now_day or int(day) == int(now_day) - 1:
+        print("days: ", day, now_day)
+        if day == now_day or int(day) == (int(now_day) + 1) if int(now_day) + 1 < 7 else 1:
             try:
                 if not conv:
                     raise vk_api.exceptions.ApiError
@@ -208,13 +209,13 @@ for event in longpoll.listen():
 
             # определение дня
             day = None
-            now_day = datetime.isoweekday(datetime.now(pytz.timezone('Asia/Dubai'))) + 1
+            now_day = datetime.isoweekday(datetime.now(pytz.timezone('Asia/Dubai')))
             if len(user_msg[0]) > 1:
                 if user_msg[0][1] in day_name.keys():
                     day = int(day_name[user_msg[0][1]])
                     del user_msg[0][1]
             if not day:
-                day = now_day
+                day = now_day + 1
             if day == 7:
                 day = 1
             print("DAAAAY: " + str(day))
