@@ -12,11 +12,12 @@ from pymysql.cursors import DictCursor
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')
+vk_session = vk_api.VkApi(token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+# vk_session = vk_api.VkApi(token='a98c5a415f7abb50a92aa9b96d245dc88282c3a01b8f0a8489cae58a9d25b2bbe9b80eb40b1076803bf7e')  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
-longpoll = MyVkLongPoll(vk_session, "200162959")
-# longpoll = VkBotLongPoll(vk_session, "200162959")
+longpoll = MyVkLongPoll(vk_session, "200162959")  # prod
+# longpoll = MyVkLongPoll(vk_session, "202164385")  # test
 # conn, cursor = db("testdb")
 '''conn = pymysql.connect(
     host='tyfooncs.mysql.pythonanywhere-services.com',
@@ -156,6 +157,9 @@ def add_hw(user_msg, day, lessons_l):
         hw[subject] = ' '.join(words[1:])
 
     hw = str(hw).replace("'", r"\'").replace('"', r'\"')
+    attach = None
+    if event.object['attachments']:
+        attach = downloadAttach() # list
     if now_hw:
         cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
         conn.commit()
@@ -163,6 +167,19 @@ def add_hw(user_msg, day, lessons_l):
         cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
         conn.commit()
     return hw
+
+
+def downloadAttach():
+    attach = []
+    for i in event.object['attachments']:
+        if i['type'] != 'photo':
+            continue
+        ph_url = i['photo']['sizes'][-5]['url']
+        with open('img.jpg', 'wb+') as ph_file:
+            ph_file.write(requests.get(ph_url).content)
+        photo = upload.photo_messages(photos=open('img.jpg', 'rb'), peer_id=event.object['peer_id'])[0]
+        attach.append(f"photo{ photo['owner_id'] }_{ photo['id'] }")
+    return attach
 
 
 def clean(day, lessons_l):
@@ -191,7 +208,15 @@ for event in longpoll.listen():
                 db='tyfooncs$data',
                 charset='utf8mb4',
                 cursorclass=DictCursor
-            )
+            )  # prod
+            '''conn = pymysql.connect(
+                host='FoonGlot.mysql.pythonanywhere-services.com',
+                user='FoonGlot',
+                password='P@ssw0rd',
+                db='FoonGlot$data',
+                charset='utf8mb4',
+                cursorclass=DictCursor
+            )'''  # test
             cursor = conn.cursor()
 
             # godmode
@@ -217,7 +242,7 @@ for event in longpoll.listen():
                     del user_msg[0][1]
             if not day:
                 day = now_day + 1
-            if day == 7:
+            if day >= 7:
                 day = 1
             print("DAAAAY: " + str(day))
 
@@ -335,7 +360,11 @@ for event in longpoll.listen():
                             subject = i[0].capitalize()
                             lessons[subject] += ' '.join(i[1:])
                         print("dict", lessons)
+
                         lessons = str(lessons).replace("'", r"\'").replace('"', r'\"')
+                        attach = None
+                        if event.object['attachments']:
+                            attach = downloadAttach() # list
                         cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                         conn.commit()
                         sh_out()

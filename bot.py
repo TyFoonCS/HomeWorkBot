@@ -88,7 +88,6 @@ def sh_out():
         for k in kuchka:
             text += k + '\n'
 
-
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
         try:
@@ -127,6 +126,7 @@ def sh_out():
         else:
             send_msg(
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+
 
 def add_hw(user_msg, day, lessons_l):
     lessons_l = eval(lessons_l[0]['lessons'])
