@@ -105,7 +105,7 @@ def sh_out():
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
         print("days: ", day, now_day)
-        if day == now_day or int(day) == (int(now_day) + 1) if int(now_day) + 1 < 7 else 1:
+        if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) + 1 < 7 else 1):
             try:
                 if not conv:
                     raise vk_api.exceptions.ApiError
@@ -190,7 +190,7 @@ def add_hw(user_msg, day, lessons_l):
     if event.object['attachments']:
         attach = downloadAttach()  # list
     if attach:
-        cursor.execute(f'select schedule from {"hw" + dialog_id}')
+        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
         if cursor.fetchall():
             cursor.execute(f'update {"hw" + dialog_id} set schedule="{str(attach)}" where id="{day}"')
             conn.commit()
@@ -223,6 +223,7 @@ def clean(day, lessons_l):
     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
     if cursor.fetchall():
         cursor.execute(f'update {"hw" + dialog_id} set hw="{str(hw)}" where id="{day}"')
+        cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
         conn.commit()
     else:
         cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(hw)}")')
@@ -257,12 +258,20 @@ for event in longpoll.listen():
 
             user_msg = event.object['text'].split('\n')
             user_msg[0] = user_msg[0].split()
-            if '@' in user_msg[0][0]:
+            if '@hosbobot' in user_msg[0][0]:
                 if len(user_msg[0]) == 1:
                     send_msg(random.choice(empty_req_answers))
                     conn.close()
                     continue
                 user_msg[0] = user_msg[0][1:]
+            if '@all' in user_msg[0][0]:
+                send_msg("че орешь на всю беседу!?")
+                conn.close()
+                continue
+            if '@' in user_msg[0][0]:
+                conn.close()
+                continue
+
 
             # определение дня
             day = None
@@ -381,7 +390,7 @@ for event in longpoll.listen():
                     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
                     lessons = cursor.fetchall()
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                    schedule_now = cursor.fetchall()[0]['lessons']
+                    schedule_now = eval(cursor.fetchall()[0]['lessons'])
                     if lessons and schedule_now:
                         if user_msg[0]:
                             lessons = eval(lessons[0]['hw'])
@@ -404,7 +413,7 @@ for event in longpoll.listen():
                         if event.object['attachments']:
                             attach = downloadAttach()  # list
                         if attach:
-                            cursor.execute(f'select schedule from {"hw" + dialog_id}')
+                            cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
                             old_att = cursor.fetchall()[0]['schedule']
                             if old_att != 'gg':
                                 old_att = eval(old_att)
