@@ -201,11 +201,20 @@ def add_hw(user_msg, day, lessons_l):
 
 
 def downloadAttach():
+    size_letters = "smxyzw"
     attach = []
     for i in event.object['attachments']:
         if i['type'] != 'photo':
             continue
-        ph_url = i['photo']['sizes'][-5]['url']
+        sizes = i['photo']['sizes']
+        max_size = 0
+        ph_url = ''
+        for size in sizes:
+            now = size_letters.find(size['type'])
+            if now > max_size:
+                max_size = now
+                ph_url = size['url']
+        # ph_url = i['photo']['sizes'][-5]['url']
         with open('img.jpg', 'wb+') as ph_file:
             ph_file.write(requests.get(ph_url).content)
         photo = upload.photo_messages(photos=open('img.jpg', 'rb'), peer_id=event.object['peer_id'])[0]
