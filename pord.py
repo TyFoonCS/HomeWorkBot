@@ -62,15 +62,28 @@ name_day = {
 }
 
 
-def send_msg(msg):
+def send_msg(msg, att=''):
     return vk.messages.send(
         peer_ids=event.object['peer_id'],
         random_id=random.random(),
-        message=msg
+        message=msg,
+        attachment=att
     )
 
 
 def sh_out():
+    print(111)
+    cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+    print(222)
+    att = cursor.fetchall()
+    attach = ''
+    if att:
+        att = att[0]['schedule']
+        print(333)
+        if att != 'gg':
+            att = eval(att)
+            attach = ','.join(att)
+
     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
     data = cursor.fetchall()
     print("data: ", data)
@@ -98,14 +111,15 @@ def sh_out():
                     raise vk_api.exceptions.ApiError
                 vk.messages.edit(peer_id=event.object['peer_id'],
                                  message=text,
-                                 conversation_message_id=int(conv[0]['lessons']))
+                                 conversation_message_id=int(conv[0]['lessons']),
+                                 attachment=attach)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=conv[0]['lessons'])
                 send_msg("Отредачил закреп")
                 print(9999)
             except Exception as exc:
                 print(exc)
                 print(77777)
-                send_msg(text)
+                send_msg(text, attach)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
                 cursor.execute(f'select * from sh{dialog_id} where id=-1')
                 if cursor.fetchall():
@@ -115,7 +129,7 @@ def sh_out():
                     cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
                     conn.commit()
         else:
-            send_msg(text)
+            send_msg(text, attach)
     else:
         print(111111111)
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
@@ -128,44 +142,61 @@ def sh_out():
             for i, lesson in enumerate(schedule):
                 print(i, lesson)
                 text += str(i + 1) + '. ' + lesson + '\n'
-            send_msg(text)
+            send_msg(text, attach)
         else:
             send_msg(
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 
 def add_hw(user_msg, day, lessons_l):
-    lessons_l = eval(lessons_l[0]['lessons'])
+    hw = ''
+    if user_msg[0]:
+        lessons_l = eval(lessons_l[0]['lessons'])
+        cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+        now_hw = cursor.fetchall()
+        if now_hw:
+            hw = eval(now_hw[0]['hw'])
+        else:
+            hw = dict()
+            for key in lessons_l:
+                hw[key] = ''
+            hw['kucha'] = ''
 
-    cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-    now_hw = cursor.fetchall()
-    if now_hw:
-        hw = eval(now_hw[0]['hw'])
-    else:
-        hw = dict()
-        for key in lessons_l:
-            hw[key] = ''
-        hw['kucha'] = ''
+        for words in user_msg:
+            words = words.split()
+            print('words: ', words)
+            if words[0].capitalize() not in lessons_l:
+                hw['kucha'] = ' '.join(words) + '-i-'
+                continue
+            subject = words[0].capitalize()
+            hw[subject] = ' '.join(words[1:])
 
-    for words in user_msg:
-        words = words.split()
-        print('words: ', words)
-        if words[0].capitalize() not in lessons_l:
-            hw['kucha'] = ' '.join(words) + '-i-'
-            continue
-        subject = words[0].capitalize()
-        hw[subject] = ' '.join(words[1:])
+        if hw['kucha']:
+            cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+            if cursor.fetchall():
+                cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
+                conn.commit()
 
-    hw = str(hw).replace("'", r"\'").replace('"', r'\"')
+        hw = str(hw).replace("'", r"\'").replace('"', r'\"')
+
+        if now_hw:
+            cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
+            conn.commit()
+        else:
+            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
+            conn.commit()
+
     attach = None
     if event.object['attachments']:
-        attach = downloadAttach() # list
-    if now_hw:
-        cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
-        conn.commit()
-    else:
-        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
-        conn.commit()
+        attach = downloadAttach()  # list
+    if attach:
+        cursor.execute(f'select schedule from {"hw" + dialog_id}')
+        if cursor.fetchall():
+            cursor.execute(f'update {"hw" + dialog_id} set schedule="{str(attach)}" where id="{day}"')
+            conn.commit()
+        else:
+            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
+            conn.commit()
     return hw
 
 
@@ -178,7 +209,7 @@ def downloadAttach():
         with open('img.jpg', 'wb+') as ph_file:
             ph_file.write(requests.get(ph_url).content)
         photo = upload.photo_messages(photos=open('img.jpg', 'rb'), peer_id=event.object['peer_id'])[0]
-        attach.append(f"photo{ photo['owner_id'] }_{ photo['id'] }")
+        attach.append(f"photo{photo['owner_id']}_{photo['id']}")
     return attach
 
 
@@ -298,6 +329,9 @@ for event in longpoll.listen():
                                 lessons_l = cursor.fetchall()
                                 if lessons_l:
                                     text = add_hw(user_msg[1:], day, lessons_l)
+                                    if not text:
+                                        send_msg("Не прикладывайте картинку.")
+                                        continue
                             cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
                     else:
                         cursor.execute(f'insert into {"sh" + dialog_id} values("{day}", "{str(lessons)}")')
@@ -318,7 +352,7 @@ for event in longpoll.listen():
                 # homework: 'description of homework'
 
                 # на случай пустого собщения после команды
-                if len(user_msg[0]) > 1:
+                if len(user_msg[0]) > 1 or event.object['attachments']:
                     user_msg[0] = ' '.join(user_msg[0][1:])
 
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
@@ -341,7 +375,7 @@ for event in longpoll.listen():
             '''
             if user_msg[0][0] in ['updatehomework', 'uh', 'доп']:
 
-                if len(user_msg[0]) > 1:
+                if len(user_msg[0]) > 1 or event.object['attachments']:
                     user_msg[0] = ' '.join(user_msg[0][1:])
 
                     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
@@ -349,24 +383,40 @@ for event in longpoll.listen():
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                     schedule_now = cursor.fetchall()[0]['lessons']
                     if lessons and schedule_now:
-                        lessons = eval(lessons[0]['hw'])
-                        print("now: ", schedule_now)
-                        for i in user_msg:
-                            i = i.split()
-                            print("i", i)
-                            if i[0].capitalize() not in schedule_now:
-                                lessons['kucha'] += ' '.join(i) + '-i-'
-                                continue
-                            subject = i[0].capitalize()
-                            lessons[subject] += ' '.join(i[1:])
-                        print("dict", lessons)
+                        if user_msg[0]:
+                            lessons = eval(lessons[0]['hw'])
+                            print("now: ", schedule_now)
+                            for i in user_msg:
+                                i = i.split()
+                                print("i", i)
+                                if i[0].capitalize() not in schedule_now:
+                                    lessons['kucha'] += ' '.join(i) + '-i-'
+                                    continue
+                                subject = i[0].capitalize()
+                                lessons[subject] += ' '.join(i[1:])
+                            print("dict", lessons)
 
-                        lessons = str(lessons).replace("'", r"\'").replace('"', r'\"')
+                            lessons = str(lessons).replace("'", r"\'").replace('"', r'\"')
+                            cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
+                            conn.commit()
+
                         attach = None
                         if event.object['attachments']:
-                            attach = downloadAttach() # list
-                        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
-                        conn.commit()
+                            attach = downloadAttach()  # list
+                        if attach:
+                            cursor.execute(f'select schedule from {"hw" + dialog_id}')
+                            old_att = cursor.fetchall()[0]['schedule']
+                            if old_att != 'gg':
+                                old_att = eval(old_att)
+                                attach = old_att + attach
+                            if old_att:
+                                cursor.execute(
+                                    f'update {"hw" + dialog_id} set schedule="{str(attach)}" where id="{day}"')
+                                conn.commit()
+                            else:
+                                cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
+                                conn.commit()
+
                         sh_out()
                         conn.close()
                         continue
@@ -405,7 +455,7 @@ for event in longpoll.listen():
                     help, помощь
                     '''
                 )
-                conn.close()
+            conn.close()
         except Exception as exc:
             print(exc)
             send_msg("Хватить меня бить:`(")
