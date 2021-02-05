@@ -2,18 +2,17 @@ import requests
 import random
 import vk_api
 import pytz
-from datetime import datetime, date
+from datetime import datetime
 from MyLongPoll import MyVkLongPoll
 # from data import db
 from vk_api import VkUpload
-from vk_api.bot_longpoll import VkBotEventType, VkBotLongPoll
+from vk_api.bot_longpoll import VkBotEventType
 import pymysql
 from pymysql.cursors import DictCursor
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(
-    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+vk_session = vk_api.VkApi(token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
 # vk_session = vk_api.VkApi(token='a98c5a415f7abb50a92aa9b96d245dc88282c3a01b8f0a8489cae58a9d25b2bbe9b80eb40b1076803bf7e')  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
@@ -72,26 +71,13 @@ def send_msg(msg, att=''):
     )
 
 
+# вывод расписания с дз
 def sh_out():
-    print(111)
-    cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
-    print(222)
-    att = cursor.fetchall()
-    attach = ''
-    if att:
-        att = att[0]['schedule']
-        print(333)
-        if att != 'gg':
-            att = eval(att)
-            attach = ','.join(att)
-
     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-    data = cursor.fetchall()
-    print("data: ", data)
+    data = eval(cursor.fetchall()[0]['hw'])
+    # дз есть
     if data:
-        # print("data: ", data)
-        data = eval(data[0]['hw'])
-
+        # запись расписания + дз в text
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
         lessons = eval(cursor.fetchall()[0]['lessons'])
         print("data", data)
@@ -103,10 +89,23 @@ def sh_out():
         for k in kuchka:
             text += k + '\n'
 
+        # запись фото в attach
+        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+        att = cursor.fetchall()
+        attach = ''
+        if att:
+            att = att[0]['schedule']
+            print(333)
+            if att != 'gg':
+                att = eval(att)
+                attach = ','.join(att)
+
+        # закрепление или вывод расписания
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
-        print("days: ", day, now_day)
+        # че за конв я не понимаю
         if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) + 1 < 7 else 1):
+            # редактирование старого дз
             try:
                 if not conv:
                     raise vk_api.exceptions.ApiError
@@ -117,6 +116,7 @@ def sh_out():
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=conv[0]['lessons'])
                 send_msg("Отредачил закреп")
                 print(9999)
+            # вывод и закреп нового дз
             except Exception as exc:
                 print(exc)
                 print(77777)
@@ -131,8 +131,8 @@ def sh_out():
                     conn.commit()
         else:
             send_msg(text, attach)
+    # в таблице нет дз
     else:
-        print(111111111)
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
         schedule = cursor.fetchall()
         print(schedule)
@@ -143,26 +143,28 @@ def sh_out():
             for i, lesson in enumerate(schedule):
                 print(i, lesson)
                 text += str(i + 1) + '. ' + lesson + '\n'
-            send_msg(text, attach)
+            send_msg(text)
         else:
             send_msg(
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 
 def add_hw(user_msg, day, lessons_l):
-    hw = ''
-    if user_msg[0]:
+    if user_msg:
         lessons_l = eval(lessons_l[0]['lessons'])
+
+        # достать дз из бд
         cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-        now_hw = cursor.fetchall()
-        if now_hw:
-            hw = eval(now_hw[0]['hw'])
+        old_hw = cursor.fetchall()
+        if old_hw:
+            hw = eval(old_hw[0]['hw'])
         else:
             hw = dict()
             for key in lessons_l:
                 hw[key] = ''
             hw['kucha'] = ''
 
+        # обработка сообщения
         for words in user_msg:
             words = words.split()
             print('words: ', words)
@@ -171,22 +173,23 @@ def add_hw(user_msg, day, lessons_l):
                 continue
             subject = words[0].capitalize()
             hw[subject] = ' '.join(words[1:])
-
         if hw['kucha']:
             cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
             if cursor.fetchall():
                 cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
                 conn.commit()
 
+        # ну этого кринжа здесь не должно быть
         hw = str(hw).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
 
-        if now_hw:
+        if old_hw:
             cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
             conn.commit()
         else:
             cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
             conn.commit()
 
+    # обработка фото
     attach = None
     if event.object['attachments']:
         attach = downloadAttach()  # list
@@ -201,6 +204,7 @@ def add_hw(user_msg, day, lessons_l):
     return hw
 
 
+# скачивание и загрузка обратно
 def downloadAttach():
     size_letters = "smxyzw"
     attach = []
@@ -215,7 +219,6 @@ def downloadAttach():
             if now > max_size:
                 max_size = now
                 ph_url = size['url']
-        # ph_url = i['photo']['sizes'][-5]['url']
         with open('img.jpg', 'wb+') as ph_file:
             ph_file.write(requests.get(ph_url).content)
         photo = upload.photo_messages(photos=open('img.jpg', 'rb'), peer_id=event.object['peer_id'])[0]
@@ -243,7 +246,6 @@ def clean(day, lessons_l):
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
         try:
-            print("Мне отправили: ", event.object['peer_id'], event.object['text'])
             conn = pymysql.connect(
                 host='tyfooncs.mysql.pythonanywhere-services.com',
                 user='tyfooncs',
@@ -262,24 +264,29 @@ for event in longpoll.listen():
             )'''  # test
             cursor = conn.cursor()
 
-            # godmode
-            god = False
-            if event.object['from_id'] in [167849130]:
-                god = True
-
+            # сплит сообщения
             user_msg = event.object['text'].split('\n')
             user_msg[0] = user_msg[0].split()
+
+            # обработка обращений
             if '@hosbobot' in user_msg[0][0]:
                 if len(user_msg[0]) == 1:
                     send_msg(random.choice(empty_req_answers))
                     conn.close()
                     continue
                 user_msg[0] = user_msg[0][1:]
-            if '@all' in user_msg[0][0]:
+            if '@all' in user_msg[0]:
                 send_msg("че орешь на всю беседу!?")
                 conn.close()
                 continue
             if '@' in user_msg[0][0]:
+                conn.close()
+                continue
+
+            # проверка на восклицательный знак перед командой
+            if user_msg[0][0][0] == '!':
+                user_msg[0][0] = user_msg[0][0][1:]
+            else:
                 conn.close()
                 continue
 
@@ -296,9 +303,12 @@ for event in longpoll.listen():
                 day = 1
             print("DAAAAY: " + str(day))
 
+            # id диалога
             dialog_id = str(event.object['peer_id'])
             dialog_id_int = int(dialog_id)
-            # автоизация по peer_id в таблице
+            next_botmsg_id = int(event.object['conversation_message_id']) + 1
+
+            # авторизация по peer_id в таблице
             cursor.execute('select * from dialogs')
             ids = cursor.fetchall()
             auth_bot = False
@@ -310,9 +320,8 @@ for event in longpoll.listen():
                 send_msg("Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
                 conn.close()
                 continue
-            # -------------------------------
 
-            next_botmsg_id = int(event.object['conversation_message_id']) + 1
+            # -------------------------------
 
             user_msg[0][0] = user_msg[0][0].lower()
 
@@ -330,32 +339,32 @@ for event in longpoll.listen():
                 format: addschedule [day of week] <list of subjects>
             '''
             if user_msg[0][0] in ['addschedule', 'уроки']:
-                # day of week: day id(1-7)
-                # pin for change
-                # list of subjects: 'subject name' by ' '
                 user_msg = user_msg[0]
                 if len(user_msg) > 2:
                     lessons = [i.capitalize() for i in user_msg[1:]]
+
+                    # обновление sh таблицы
                     cursor.execute(f'select * from {"sh" + dialog_id} where id="{day}"')
                     if cursor.fetchall():
                         cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{day}"')
-                        cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-                        if cursor.fetchall():
-                            if len(user_msg) > 1:
-                                # user_msg[0] = ' '.join(user_msg[0][1:])
-                                # user_msg.append('-')
-                                cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                                lessons_l = cursor.fetchall()
-                                if lessons_l:
-                                    text = add_hw(user_msg[1:], day, lessons_l)
-                                    if not text:
-                                        send_msg("Не прикладывайте картинку.")
-                                        continue
-                            cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
+
+                    # обновление hw таблицы
+                    cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+                    if cursor.fetchall():
+                        if len(user_msg) > 1:
+                            cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                            lessons_l = cursor.fetchall()
+                            if lessons_l:
+                                text = add_hw(user_msg[1:], day, lessons_l)
+                                if not text:
+                                    send_msg("Не прикладывайте картинку.")
+                                    continue
+                        cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
                     else:
                         cursor.execute(f'insert into {"sh" + dialog_id} values("{day}", "{str(lessons)}")')
                         conn.commit()
-                    schedule_now = "\n".join(lessons) + "\nDone"
+
+                    schedule_now = name_day[str(now_day)] + ''.join([f'\n{n+1}. {i}' for n, i in enumerate(lessons)])
                     send_msg(schedule_now)
                     conn.close()
                     continue
@@ -366,14 +375,10 @@ for event in longpoll.listen():
                         [subject]: [homework]
             '''
             if user_msg[0][0] in ['addhw', 'addhomework', 'ah', 'дз']:
-                # day: пн-сб
-                # subject: 'subject name'
-                # homework: 'description of homework'
-
-                # на случай пустого собщения после команды
                 if len(user_msg[0]) > 1 or event.object['attachments']:
                     user_msg[0] = ' '.join(user_msg[0][1:])
 
+                    # есть ли расписание
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                     lessons_l = cursor.fetchall()
                     if lessons_l:
@@ -393,7 +398,6 @@ for event in longpoll.listen():
                         [subject]: [homework]
             '''
             if user_msg[0][0] in ['updatehomework', 'uh', 'доп']:
-
                 if len(user_msg[0]) > 1 or event.object['attachments']:
                     user_msg[0] = ' '.join(user_msg[0][1:])
 
@@ -402,6 +406,7 @@ for event in longpoll.listen():
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                     schedule_now = eval(cursor.fetchall()[0]['lessons'])
                     if lessons and schedule_now:
+                        # дополнение дз
                         if user_msg[0]:
                             lessons = eval(lessons[0]['hw'])
                             print("now: ", schedule_now)
@@ -415,10 +420,12 @@ for event in longpoll.listen():
                                 lessons[subject] += ' '.join(i[1:])
                             print("dict", lessons)
 
+                            # ну этого кринжа здесь не должно быть
                             lessons = str(lessons).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
+
                             cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                             conn.commit()
-
+                        # дополнение фото
                         attach = None
                         if event.object['attachments']:
                             attach = downloadAttach()  # list
@@ -464,14 +471,13 @@ for event in longpoll.listen():
                 send_msg(
                     '''Команды и примеры:
                     https://vk.com/topic-200162959_46878569
-                    !День вводить необязательно!
-                    предметы <список предметов через пробел>
+                    !День по умолчанию завтрашний, вводить необязательно!
                     расписание [день]
                     уроки [день] <список предметов через пробел>
                     дз [день] <дз>
                     доп [день] <дз>
                     стереть [день]
-                    help, помощь
+                    помощь
                     '''
                 )
             conn.close()
