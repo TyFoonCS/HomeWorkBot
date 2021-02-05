@@ -12,7 +12,8 @@ from pymysql.cursors import DictCursor
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+vk_session = vk_api.VkApi(
+    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
 # vk_session = vk_api.VkApi(token='a98c5a415f7abb50a92aa9b96d245dc88282c3a01b8f0a8489cae58a9d25b2bbe9b80eb40b1076803bf7e')  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
@@ -177,7 +178,7 @@ def add_hw(user_msg, day, lessons_l):
                 cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
                 conn.commit()
 
-        hw = str(hw).replace("'", r"\'").replace('"', r'\"')
+        hw = str(hw).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
 
         if now_hw:
             cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
@@ -242,6 +243,7 @@ def clean(day, lessons_l):
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
         try:
+            print("Мне отправили: ", event.object['peer_id'], event.object['text'])
             conn = pymysql.connect(
                 host='tyfooncs.mysql.pythonanywhere-services.com',
                 user='tyfooncs',
@@ -280,7 +282,6 @@ for event in longpoll.listen():
             if '@' in user_msg[0][0]:
                 conn.close()
                 continue
-
 
             # определение дня
             day = None
@@ -414,7 +415,7 @@ for event in longpoll.listen():
                                 lessons[subject] += ' '.join(i[1:])
                             print("dict", lessons)
 
-                            lessons = str(lessons).replace("'", r"\'").replace('"', r'\"')
+                            lessons = str(lessons).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
                             cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
                             conn.commit()
 
