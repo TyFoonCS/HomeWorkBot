@@ -74,9 +74,10 @@ def send_msg(msg, att=''):
 # вывод расписания с дз
 def sh_out():
     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-    data = eval(cursor.fetchall()[0]['hw'])
+    data = cursor.fetchall()
     # дз есть
     if data:
+        data = eval(data[0]['hw'])
         # запись расписания + дз в text
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
         lessons = eval(cursor.fetchall()[0]['lessons'])
