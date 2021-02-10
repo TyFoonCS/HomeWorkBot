@@ -9,6 +9,7 @@ from vk_api import VkUpload
 from vk_api.bot_longpoll import VkBotEventType
 import pymysql
 from pymysql.cursors import DictCursor
+import json
 
 session = requests.Session()
 
@@ -77,14 +78,29 @@ def sh_out():
     data = cursor.fetchall()
     # дз есть
     if data:
-        data = eval(data[0]['hw'])
+        try:
+            print(1, data, type(data))
+            data = json.loads(data[0]['hw'])
+            print(2, data, type(data))
+            # data = data[0]['hw']
+        except BaseException as exc:
+            print("JSON FAIL: ", exc)
+            data = eval(data[0]['hw'])
+        print("DataDone ", data, type(data))
         # запись расписания + дз в text
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-        lessons = eval(cursor.fetchall()[0]['lessons'])
+        lessons = cursor.fetchall()
+        try:
+            lessons = json.loads(lessons[0]['lessons'])
+            # lessons = lessons[0]['lessons']
+        except BaseException as exc:
+            print("JSON FAIL: ", exc)
+            lessons = eval(lessons[0]['lessons'])
         print("data", data)
         text = name_day[str(day)] + '\n'
         for i, key in enumerate(lessons):
-            text += str(i + 1) + '. ' + key + ': ' + data[key] + '\n'
+            corrrect_data = '\n'.join(data[key].split('-i-')[:-1])
+            text += str(i + 1) + '. ' + key + ': ' + corrrect_data + '\n'
         text += 'Остальное ДЗ:\n'
         kuchka = data['kucha'].split('-i-')
         for k in kuchka:
@@ -96,9 +112,14 @@ def sh_out():
         attach = ''
         if att:
             att = att[0]['schedule']
-            print(333)
+            print(333, att)
             if att != 'gg':
-                att = eval(att)
+                try:
+                    att = json.loads(att)
+                    # att = att
+                except BaseException as exc:
+                    print("JSON FAIL: ", exc)
+                    att = eval(att)
                 attach = ','.join(att)
 
         # закрепление или вывод расписания
@@ -139,7 +160,12 @@ def sh_out():
         print(schedule)
         if schedule:
             print("sh: ", schedule)
-            schedule = eval(schedule[0]['lessons'])
+            try:
+                schedule = json.loads(schedule[0]['lessons'])
+                # schedule = schedule[0]['lessons']
+            except BaseException as exc:
+                print("JSON FAIL: ", exc)
+                schedule = eval(schedule[0]['lessons'])
             text = ''
             for i, lesson in enumerate(schedule):
                 print(i, lesson)
@@ -151,14 +177,25 @@ def sh_out():
 
 
 def add_hw(user_msg, day, lessons_l):
-    if user_msg:
-        lessons_l = eval(lessons_l[0]['lessons'])
+    print(user_msg)
+    hw = ''
+    if user_msg[0]:
+        try:
+            lessons_l = json.loads(lessons_l[0]['lessons'])
+        except BaseException as exc:
+            print("JSON FAIL: ", exc)
+            lessons_l = eval(lessons_l[0]['lessons'])
 
         # достать дз из бд
         cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
         old_hw = cursor.fetchall()
         if old_hw:
-            hw = eval(old_hw[0]['hw'])
+            try:
+                hw = json.loads(old_hw[0]['hw'])
+            except BaseException as exc:
+                print("JSON FAIL: ", exc)
+                hw = eval(old_hw[0]['hw'])
+            print("ahhw: ", hw, type(hw))
         else:
             hw = dict()
             for key in lessons_l:
@@ -173,21 +210,20 @@ def add_hw(user_msg, day, lessons_l):
                 hw['kucha'] = ' '.join(words) + '-i-'
                 continue
             subject = words[0].capitalize()
-            hw[subject] = ' '.join(words[1:])
+            hw[subject] = ' '.join(words[1:]) + '-i-'
         if hw['kucha']:
             cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
             if cursor.fetchall():
                 cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
                 conn.commit()
 
-        # ну этого кринжа здесь не должно быть
-        hw = str(hw).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
+        hw = conn.escape(str(json.dumps(hw)))
 
         if old_hw:
-            cursor.execute(f'update {"hw" + dialog_id} set hw="{hw}" where id="{day}"')
+            cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
             conn.commit()
         else:
-            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{hw}")')
+            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
             conn.commit()
 
     # обработка фото
@@ -228,20 +264,30 @@ def downloadAttach():
 
 
 def clean(day, lessons_l):
-    lessons_l = eval(lessons_l[0]['lessons'])
+    try:
+        lessons_l = json.loads(lessons_l[0]['lessons'])
+    except BaseException as exc:
+        print("clean ll", exc, type(lessons_l))
+        lessons_l = eval(lessons_l[0]['lessons'])
+    print(lessons_l, type(lessons_l))
     hw = dict()
     for key in lessons_l:
         hw[key] = ''
     hw['kucha'] = ''
-
+    print(hw, type(hw))
+    print("cleanhw ", str(json.dumps(hw)), json.loads(str(json.dumps(hw))))
+    hw = conn.escape(str(json.dumps(hw)))  # , ensure_ascii=False
+    print("hwescape: ", hw)
+    # gg
     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
     if cursor.fetchall():
-        cursor.execute(f'update {"hw" + dialog_id} set hw="{str(hw)}" where id="{day}"')
+        cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
         cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
         conn.commit()
     else:
-        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "{str(hw)}")')
+        cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
         conn.commit()
+    print("clean done!")
 
 
 for event in longpoll.listen():
@@ -347,7 +393,8 @@ for event in longpoll.listen():
                     # обновление sh таблицы
                     cursor.execute(f'select * from {"sh" + dialog_id} where id="{day}"')
                     if cursor.fetchall():
-                        cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(lessons)}" where id="{day}"')
+                        cursor.execute(
+                            f'update {"sh" + dialog_id} set lessons={conn.escape(str(json.dumps(lessons)))} where id="{day}"')
 
                     # обновление hw таблицы
                     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
@@ -362,10 +409,11 @@ for event in longpoll.listen():
                                     continue
                         cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
                     else:
-                        cursor.execute(f'insert into {"sh" + dialog_id} values("{day}", "{str(lessons)}")')
+                        cursor.execute(
+                            f'insert into {"sh" + dialog_id} values("{day}", {conn.escape(str(json.dumps(lessons)))})')
                         conn.commit()
 
-                    schedule_now = name_day[str(now_day)] + ''.join([f'\n{n+1}. {i}' for n, i in enumerate(lessons)])
+                    schedule_now = name_day[str(now_day)] + ''.join([f'\n{n + 1}. {i}' for n, i in enumerate(lessons)])
                     send_msg(schedule_now)
                     conn.close()
                     continue
@@ -405,11 +453,20 @@ for event in longpoll.listen():
                     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
                     lessons = cursor.fetchall()
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                    schedule_now = eval(cursor.fetchall()[0]['lessons'])
+                    schedule_now = cursor.fetchall()
+                    try:
+                        schedule_now = json.loads(schedule_now[0]['lessons'])
+                    except BaseException as exc:
+                        print("JSON FAIL: ", exc)
+                        schedule_now = eval(schedule_now[0]['lessons'])
                     if lessons and schedule_now:
                         # дополнение дз
                         if user_msg[0]:
-                            lessons = eval(lessons[0]['hw'])
+                            try:
+                                lessons = json.loads(lessons[0]['hw'])
+                            except BaseException as exc:
+                                print("JSON FAIL: ", exc)
+                                lessons = eval(lessons[0]['hw'])
                             print("now: ", schedule_now)
                             for i in user_msg:
                                 i = i.split()
@@ -418,13 +475,12 @@ for event in longpoll.listen():
                                     lessons['kucha'] += ' '.join(i) + '-i-'
                                     continue
                                 subject = i[0].capitalize()
-                                lessons[subject] += ' '.join(i[1:])
+                                lessons[subject] += ' '.join(i[1:]) + '-i-'
                             print("dict", lessons)
 
-                            # ну этого кринжа здесь не должно быть
-                            lessons = str(lessons).replace("'", r"\'").replace('"', r'\"').replace(r'\n', '')
+                            lessons = conn.escape(str(json.dumps(lessons)))
 
-                            cursor.execute(f'update {"hw" + dialog_id} set hw="{str(lessons)}" where id="{day}"')
+                            cursor.execute(f'update {"hw" + dialog_id} set hw={lessons} where id="{day}"')
                             conn.commit()
                         # дополнение фото
                         attach = None
@@ -434,11 +490,22 @@ for event in longpoll.listen():
                             cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
                             old_att = cursor.fetchall()[0]['schedule']
                             if old_att != 'gg':
-                                old_att = eval(old_att)
-                                attach = old_att + attach
+                                try:
+                                    old_att = json.loads(old_att)
+                                except BaseException as exc:
+                                    print("JSON FAIL: ", exc)
+                                    old_att = eval(old_att)
+                                print(type(old_att), type(attach))
+                                attach = str(json.dumps(old_att + attach))
+                            else:
+                                attach = str(json.dumps(attach))
+                            print(11, attach, type(attach))
+                            attach = conn.escape(attach)
+                            print(22, attach)
                             if old_att:
+                                print("uhph", attach)
                                 cursor.execute(
-                                    f'update {"hw" + dialog_id} set schedule="{str(attach)}" where id="{day}"')
+                                    f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
                                 conn.commit()
                             else:
                                 cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
