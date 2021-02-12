@@ -220,9 +220,23 @@ def add_hw(user_msg, day, lessons_l):
     if event.object['attachments']:
         attach = downloadAttach()  # list
     if attach:
+        attach = conn.escape(str(json.dumps(attach)))
         cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
         if cursor.fetchall():
-            cursor.execute(f'update {"hw" + dialog_id} set schedule="{str(attach)}" where id="{day}"')
+            # чистка кучи
+            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+            hw_now = cursor.fetchall()
+            if hw_now:
+                try:
+                    hw_now = json.loads(str(hw_now[0]['hw']))
+                except BaseException as exc:
+                    print("JSON FAIL in hw_now add_hw: ", exc)
+                    hw_now = eval(hw_now[0]['hw'])
+            hw_now['kucha'] = ''
+            hw_now = conn.escape(str(json.dumps(hw_now)))
+
+            cursor.execute(f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
+            cursor.execute(f'update {"hw" + dialog_id} set hw={hw_now} where id="{day}"')
             conn.commit()
         else:
             cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
@@ -278,7 +292,8 @@ for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
         try:
             user = vk.users.get(user_ids=event.object['from_id'])
-            print(event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'])
+            print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
+                  '\n')
 
             conn = pymysql.connect(
                 host='tyfooncs.mysql.pythonanywhere-services.com',
