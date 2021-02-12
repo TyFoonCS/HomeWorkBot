@@ -277,6 +277,9 @@ def clean(day, lessons_l):
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW and event.object['text']:
         try:
+            user = vk.users.get(user_ids=event.object['from_id'])
+            print(event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'])
+
             conn = pymysql.connect(
                 host='tyfooncs.mysql.pythonanywhere-services.com',
                 user='tyfooncs',
