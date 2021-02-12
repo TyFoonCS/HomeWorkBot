@@ -79,12 +79,10 @@ def sh_out():
     # дз есть
     if data:
         try:
-            print(1, data, type(data))
             data = json.loads(data[0]['hw'])
-            print(2, data, type(data))
             # data = data[0]['hw']
         except BaseException as exc:
-            print("JSON FAIL: ", exc)
+            print("JSON FAIL in data: ", exc)
             data = eval(data[0]['hw'])
         print("DataDone ", data, type(data))
         # запись расписания + дз в text
@@ -94,7 +92,7 @@ def sh_out():
             lessons = json.loads(lessons[0]['lessons'])
             # lessons = lessons[0]['lessons']
         except BaseException as exc:
-            print("JSON FAIL: ", exc)
+            print("JSON FAIL in lessons sh_out: ", exc)
             lessons = eval(lessons[0]['lessons'])
         print("data", data)
         text = name_day[str(day)] + '\n'
@@ -112,13 +110,12 @@ def sh_out():
         attach = ''
         if att:
             att = att[0]['schedule']
-            print(333, att)
             if att != 'gg':
                 try:
                     att = json.loads(att)
                     # att = att
                 except BaseException as exc:
-                    print("JSON FAIL: ", exc)
+                    print("JSON FAIL in att sh_out: ", exc)
                     att = eval(att)
                 attach = ','.join(att)
 
@@ -137,11 +134,9 @@ def sh_out():
                                  attachment=attach)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=conv[0]['lessons'])
                 send_msg("Отредачил закреп")
-                print(9999)
             # вывод и закреп нового дз
             except Exception as exc:
-                print(exc)
-                print(77777)
+                print("exc in correct old", exc)
                 send_msg(text, attach)
                 vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
                 cursor.execute(f'select * from sh{dialog_id} where id=-1')
@@ -157,18 +152,14 @@ def sh_out():
     else:
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
         schedule = cursor.fetchall()
-        print(schedule)
         if schedule:
-            print("sh: ", schedule)
             try:
                 schedule = json.loads(schedule[0]['lessons'])
-                # schedule = schedule[0]['lessons']
             except BaseException as exc:
-                print("JSON FAIL: ", exc)
+                print("JSON FAIL in only schedule sh_out(end): ", exc)
                 schedule = eval(schedule[0]['lessons'])
             text = ''
             for i, lesson in enumerate(schedule):
-                print(i, lesson)
                 text += str(i + 1) + '. ' + lesson + '\n'
             send_msg(text)
         else:
@@ -177,13 +168,12 @@ def sh_out():
 
 
 def add_hw(user_msg, day, lessons_l):
-    print(user_msg)
     hw = ''
     if user_msg[0]:
         try:
             lessons_l = json.loads(lessons_l[0]['lessons'])
         except BaseException as exc:
-            print("JSON FAIL: ", exc)
+            print("JSON FAIL in lessons_l add_hw: ", exc)
             lessons_l = eval(lessons_l[0]['lessons'])
 
         # достать дз из бд
@@ -193,9 +183,8 @@ def add_hw(user_msg, day, lessons_l):
             try:
                 hw = json.loads(old_hw[0]['hw'])
             except BaseException as exc:
-                print("JSON FAIL: ", exc)
+                print("JSON FAIL in old_hw add_hw: ", exc)
                 hw = eval(old_hw[0]['hw'])
-            print("ahhw: ", hw, type(hw))
         else:
             hw = dict()
             for key in lessons_l:
@@ -267,17 +256,13 @@ def clean(day, lessons_l):
     try:
         lessons_l = json.loads(lessons_l[0]['lessons'])
     except BaseException as exc:
-        print("clean ll", exc, type(lessons_l))
+        print("clean exc", exc)
         lessons_l = eval(lessons_l[0]['lessons'])
-    print(lessons_l, type(lessons_l))
     hw = dict()
     for key in lessons_l:
         hw[key] = ''
     hw['kucha'] = ''
-    print(hw, type(hw))
-    print("cleanhw ", str(json.dumps(hw)), json.loads(str(json.dumps(hw))))
     hw = conn.escape(str(json.dumps(hw)))  # , ensure_ascii=False
-    print("hwescape: ", hw)
     # gg
     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
     if cursor.fetchall():
@@ -287,7 +272,6 @@ def clean(day, lessons_l):
     else:
         cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
         conn.commit()
-    print("clean done!")
 
 
 for event in longpoll.listen():
@@ -457,7 +441,7 @@ for event in longpoll.listen():
                     try:
                         schedule_now = json.loads(schedule_now[0]['lessons'])
                     except BaseException as exc:
-                        print("JSON FAIL: ", exc)
+                        print("JSON FAIL in schedule_now uh: ", exc)
                         schedule_now = eval(schedule_now[0]['lessons'])
                     if lessons and schedule_now:
                         # дополнение дз
@@ -465,7 +449,7 @@ for event in longpoll.listen():
                             try:
                                 lessons = json.loads(lessons[0]['hw'])
                             except BaseException as exc:
-                                print("JSON FAIL: ", exc)
+                                print("JSON FAIL in lessons uh: ", exc)
                                 lessons = eval(lessons[0]['hw'])
                             print("now: ", schedule_now)
                             for i in user_msg:
@@ -493,17 +477,14 @@ for event in longpoll.listen():
                                 try:
                                     old_att = json.loads(old_att)
                                 except BaseException as exc:
-                                    print("JSON FAIL: ", exc)
+                                    print("JSON FAIL in old_att uh: ", exc)
                                     old_att = eval(old_att)
                                 print(type(old_att), type(attach))
                                 attach = str(json.dumps(old_att + attach))
                             else:
                                 attach = str(json.dumps(attach))
-                            print(11, attach, type(attach))
                             attach = conn.escape(attach)
-                            print(22, attach)
                             if old_att:
-                                print("uhph", attach)
                                 cursor.execute(
                                     f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
                                 conn.commit()
@@ -550,6 +531,6 @@ for event in longpoll.listen():
                 )
             conn.close()
         except Exception as exc:
-            print(exc)
+            print("general end exc: ", exc)
             send_msg("Хватить меня бить:`(")
             continue
