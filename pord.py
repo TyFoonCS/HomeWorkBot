@@ -13,8 +13,10 @@ import json
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
-# vk_session = vk_api.VkApi(token='a98c5a415f7abb50a92aa9b96d245dc88282c3a01b8f0a8489cae58a9d25b2bbe9b80eb40b1076803bf7e')  # test
+vk_session = vk_api.VkApi(
+    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+'''vk_session = vk_api.VkApi(
+    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')'''  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
 longpoll = MyVkLongPoll(vk_session, "200162959")  # prod
@@ -299,7 +301,7 @@ for event in longpoll.listen():
             print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
                   '\n')
 
-            '''conn = pymysql.connect(
+            conn = pymysql.connect(
                 host='tyfooncs.mysql.pythonanywhere-services.com',
                 user='tyfooncs',
                 password='P@ssw0rd',
