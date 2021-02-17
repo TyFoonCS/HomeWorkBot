@@ -192,15 +192,17 @@ def add_hw(user_msg, day, lessons_l):
             hw['kucha'] = ''
 
         # обработка сообщения
+        kucha = ''
         for words in user_msg:
             words = words.split()
             print('words: ', words)
             if words[0].capitalize() not in lessons_l:
-                hw['kucha'] = ' '.join(words) + '-i-'
+                kucha += ' '.join(words) + '-i-'
                 continue
             subject = words[0].capitalize()
             hw[subject] = ' '.join(words[1:]) + '-i-'
-        if hw['kucha']:
+        if kucha:
+            hw['kucha'] = kucha
             cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
             if cursor.fetchall():
                 cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
@@ -210,10 +212,9 @@ def add_hw(user_msg, day, lessons_l):
 
         if old_hw:
             cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
-            conn.commit()
         else:
             cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
-            conn.commit()
+        conn.commit()
 
     # обработка фото
     attach = None
@@ -223,24 +224,10 @@ def add_hw(user_msg, day, lessons_l):
         attach = conn.escape(str(json.dumps(attach)))
         cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
         if cursor.fetchall():
-            # чистка кучи
-            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-            hw_now = cursor.fetchall()
-            if hw_now:
-                try:
-                    hw_now = json.loads(str(hw_now[0]['hw']))
-                except BaseException as exc:
-                    print("JSON FAIL in hw_now add_hw: ", exc)
-                    hw_now = eval(hw_now[0]['hw'])
-            hw_now['kucha'] = ''
-            hw_now = conn.escape(str(json.dumps(hw_now)))
-
             cursor.execute(f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
-            cursor.execute(f'update {"hw" + dialog_id} set hw={hw_now} where id="{day}"')
-            conn.commit()
         else:
             cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
-            conn.commit()
+        conn.commit()
     return hw
 
 
