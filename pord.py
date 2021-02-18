@@ -21,18 +21,10 @@ vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
 longpoll = MyVkLongPoll(vk_session, "200162959")  # prod
 # longpoll = MyVkLongPoll(vk_session, "202164385")  # test
-# conn, cursor = db("testdb")
-'''conn = pymysql.connect(
-    host='tyfooncs.mysql.pythonanywhere-services.com',
-    user='tyfooncs',
-    password='P@ssw0rd',
-    db='tyfooncs$data',
-    charset='utf8mb4',
-    cursorclass=DictCursor
-)
-cursor = conn.cursor()'''
+
 
 empty_req_answers = ("Что надо?", "Звали?", "Доброго времени суток, дамы и господа.\nЧего желаете?", "Чего изволите?")
+error_stickers = ('17150', '53121', '50121', '8447')
 
 day_name = {
     "пн": 1,
@@ -557,4 +549,9 @@ for event in longpoll.listen():
         except Exception as exc:
             print("general end exc: ", exc)
             send_msg("Хватить меня бить:`(")
+            vk.messages.send(
+                peer_ids=event.object['peer_id'],
+                random_id=random.random(),
+                sticker_id=random.choice(error_stickers)
+            )
             continue
