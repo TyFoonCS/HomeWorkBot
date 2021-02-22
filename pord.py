@@ -338,6 +338,41 @@ for event in longpoll.listen():
                     conn.close()
                     continue
 
+                # id диалога
+                dialog_id = str(event.object['peer_id'])
+                dialog_id_int = int(dialog_id)
+                next_botmsg_id = int(event.object['conversation_message_id']) + 1
+
+                # God Mode
+                if dialog_id in ("167849130", "182293940"):
+                    '''
+                        !db // database manage
+                        format: !db <request>
+                    '''
+                    if user_msg[0][0] == 'db':
+                        req = ' '.join(user_msg[0][1:])
+                        cursor.execute(req)
+                        conn.commit()
+                        fetch = cursor.fetchall()
+                        send_msg(f"Done Admin!\n{fetch}")
+
+                    '''
+                        !sc // send to some chat
+                        format: !sc <chat_id> <msg>
+                    '''
+                    if user_msg[0][0] == 'sc':
+                        print(user_msg[0])
+                        chat_id = 2000000000 + int(user_msg[0][1])
+                        user_msg[0] = ' '.join(user_msg[0][2:])
+                        vk.messages.send(
+                            peer_id=chat_id,
+                            random_id=random.random(),
+                            message='\n'.join(user_msg)
+                        )
+                        send_msg("Done Admin!")
+                    conn.close()
+                    continue
+
                 # определение дня
                 day = None
                 now_day = datetime.isoweekday(datetime.now(pytz.timezone('Asia/Dubai')))
@@ -350,11 +385,6 @@ for event in longpoll.listen():
                 if day >= 7:
                     day = 1
                 print("DAAAAY: " + str(day))
-
-                # id диалога
-                dialog_id = str(event.object['peer_id'])
-                dialog_id_int = int(dialog_id)
-                next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
                 # авторизация по peer_id в таблице
                 cursor.execute('select * from dialogs')
@@ -414,7 +444,8 @@ for event in longpoll.listen():
                                 f'insert into {"sh" + dialog_id} values("{day}", {conn.escape(str(json.dumps(lessons)))})')
                             conn.commit()
 
-                        schedule_now = name_day[str(now_day)] + ''.join([f'\n{n + 1}. {i}' for n, i in enumerate(lessons)])
+                        schedule_now = name_day[str(now_day)] + ''.join(
+                            [f'\n{n + 1}. {i}' for n, i in enumerate(lessons)])
                         send_msg(schedule_now)
                         conn.close()
                         continue
@@ -563,4 +594,5 @@ for event in longpoll.listen():
                 random_id=random.random(),
                 sticker_id='21'
             )
-            send_msg('Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
+            send_msg(
+                'Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
