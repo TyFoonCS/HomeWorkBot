@@ -213,7 +213,7 @@ def add_hw(user_msg, day, lessons_l):
     # обработка фото
     attach = None
     if event.object['attachments']:
-        attach = downloadAttach()  # list
+        attach = download_attach()  # list
     if attach:
         attach = conn.escape(str(json.dumps(attach)))
 
@@ -243,7 +243,7 @@ def add_hw(user_msg, day, lessons_l):
 
 
 # скачивание и загрузка обратно
-def downloadAttach():
+def download_attach():
     size_letters = "smxyzw"
     attach = []
     for i in event.object['attachments']:
@@ -340,7 +340,6 @@ for event in longpoll.listen():
 
                 # id диалога
                 dialog_id = str(event.object['peer_id'])
-                dialog_id_int = int(dialog_id)
                 next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
                 # God Mode
@@ -358,10 +357,9 @@ for event in longpoll.listen():
 
                     '''
                         !sc // send to some chat
-                        format: !sc <chat_id> <msg>
+                        format: !sc <chat_id without 2000....> <msg>
                     '''
                     if user_msg[0][0] == 'sc':
-                        print(user_msg[0])
                         chat_id = 2000000000 + int(user_msg[0][1])
                         user_msg[0] = ' '.join(user_msg[0][2:])
                         vk.messages.send(
@@ -370,6 +368,26 @@ for event in longpoll.listen():
                             message='\n'.join(user_msg)
                         )
                         send_msg("Done Admin!")
+
+                    '''
+                        !new // new bot chat authorization
+                        format: !new <<chat_id without 2000....>
+                    '''
+                    if user_msg[0][0] == 'new':
+                        chat_id = 2000000000 + int(user_msg[0][1])
+                        # проверка на уже существующую беседу в БД
+                        cursor.execute(f'select id from dialogs where id="{chat_id}"')
+                        if cursor.fetchall():
+                            send_msg("Эта беседа уже авторизована")
+                            conn.close()
+                            continue
+                        # создание таблиц для новой беседы
+                        cursor.execute(f'insert into dialogs values("{chat_id}", NULL)')
+                        cursor.execute(f'create table {"sh" + str(chat_id)} (id integer, lessons text)')
+                        cursor.execute(f'create table {"hw" + str(chat_id)} (id integer, schedule text, hw text)')
+                        send_msg("Бот готов работать в этой беседе. Напомни им про админку для него!")
+
+                    # разрыв соединения с БД и конец итерации
                     conn.close()
                     continue
 
@@ -390,8 +408,8 @@ for event in longpoll.listen():
                 cursor.execute('select * from dialogs')
                 ids = cursor.fetchall()
                 auth_bot = False
-                for id in ids:
-                    if int(dialog_id_int) == id['id']:
+                for now_id in ids:
+                    if int(dialog_id) == now_id['id']:
                         auth_bot = True
                         break
                 if not auth_bot:
@@ -438,7 +456,7 @@ for event in longpoll.listen():
                                     if not text:
                                         send_msg("Не прикладывайте картинку.")
                                         continue
-                            cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
+                                    cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
                         else:
                             cursor.execute(
                                 f'insert into {"sh" + dialog_id} values("{day}", {conn.escape(str(json.dumps(lessons)))})')
@@ -517,7 +535,7 @@ for event in longpoll.listen():
                             # дополнение фото
                             attach = None
                             if event.object['attachments']:
-                                attach = downloadAttach()  # list
+                                attach = download_attach()  # list
                             if attach:
                                 cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
                                 old_att = cursor.fetchall()[0]['schedule']
