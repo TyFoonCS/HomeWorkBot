@@ -387,6 +387,22 @@ for event in longpoll.listen():
                         cursor.execute(f'create table {"hw" + str(chat_id)} (id integer, schedule text, hw text)')
                         send_msg("Бот готов работать в этой беседе. Напомни им про админку для него!")
 
+                    '''
+                        !spam // send msg to all
+                        format: !spam <msg>
+                    '''
+                    if user_msg[0][0] == 'spam':
+                        cursor.execute('select id from dialogs')
+                        ids = [list(i.values())[0] for i in cursor.fetchall()]
+                        user_msg[0] = ' '.join(user_msg[0][1:])
+                        for chat_id in ids:
+                            vk.messages.send(
+                                peer_ids=chat_id,
+                                random_id=random.random(),
+                                message='\n'.join(user_msg)
+                            )
+                        send_msg("Done Admin!")
+
                     # разрыв соединения с БД и конец итерации
                     conn.close()
                     continue
