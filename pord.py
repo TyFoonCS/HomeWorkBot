@@ -542,7 +542,8 @@ for event in longpoll.listen():
                                         lessons['kucha'] += ' '.join(i) + '-i-'
                                         continue
                                     subject = i[0].capitalize()
-                                    lessons[subject] += ' '.join(i[1:]) + '-i-'
+                                    if i[1:]:
+                                        lessons[subject] += ' '.join(i[1:]) + '-i-'
                                 print("dict", lessons)
 
                                 lessons = conn.escape(str(json.dumps(lessons)))
