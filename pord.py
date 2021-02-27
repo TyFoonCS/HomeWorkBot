@@ -353,6 +353,7 @@ for event in longpoll.listen():
                         cursor.execute(req)
                         conn.commit()
                         fetch = cursor.fetchall()
+                        fetch = '\n'.join([str(list(i.keys())[0]) + ' : ' + str(i[list(i.keys())[0]]) for i in fetch])
                         send_msg(f"Done Admin!\n{fetch}")
 
                     '''
@@ -441,7 +442,7 @@ for event in longpoll.listen():
                     show schedule // вывести и закрепить дз
                     format: schedule [day] (optionally)
                 '''
-                if user_msg[0][0] in ['sh', 'schedule', 'расписание', 'рп']:
+                if user_msg[0][0] in ('sh', 'schedule', 'расписание', 'рп'):
                     sh_out()
                     conn.close()
                     continue
@@ -450,7 +451,7 @@ for event in longpoll.listen():
                     add static schedule // добавить постоянное расписание
                     format: addschedule [day of week] <list of subjects>
                 '''
-                if user_msg[0][0] in ['addschedule', 'уроки']:
+                if user_msg[0][0] in ('addschedule', 'уроки'):
                     user_msg = user_msg[0]
                     if len(user_msg) > 2:
                         lessons = [i.capitalize() for i in user_msg[1:]]
@@ -489,7 +490,7 @@ for event in longpoll.listen():
                     format: addhomework [date](optionally)
                             [subject]: [homework]
                 '''
-                if user_msg[0][0] in ['addhw', 'addhomework', 'ah', 'дз']:
+                if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз'):
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
 
@@ -512,7 +513,7 @@ for event in longpoll.listen():
                     format: updatehomework [date](optionally)
                             [subject]: [homework]
                 '''
-                if user_msg[0][0] in ['updatehomework', 'uh', 'доп']:
+                if user_msg[0][0] in ('updatehomework', 'uh', 'доп'):
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
 
@@ -541,7 +542,8 @@ for event in longpoll.listen():
                                         lessons['kucha'] += ' '.join(i) + '-i-'
                                         continue
                                     subject = i[0].capitalize()
-                                    lessons[subject] += ' '.join(i[1:]) + '-i-'
+                                    if i[1:]:
+                                        lessons[subject] += ' '.join(i[1:]) + '-i-'
                                 print("dict", lessons)
 
                                 lessons = conn.escape(str(json.dumps(lessons)))
@@ -592,13 +594,22 @@ for event in longpoll.listen():
                     else:
                         send_msg(
                             "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
-                        conn.close()
-                        continue
+                    conn.close()
+                    continue
+
+                '''
+                    show chat id // вывести id беседы
+                    !id
+                '''
+                if user_msg[0][0] in ('id', 'айди'):
+                    send_msg('ID беседы : ' + str(int(dialog_id) - 2000000000))
+                    conn.close()
+                    continue
 
                 '''
                     show help // показать помощь
                 '''
-                if user_msg[0][0] in ['help', 'помощь']:
+                if user_msg[0][0] in ('help', 'помощь'):
                     send_msg(
                         '''Команды и примеры:
                         https://vk.com/topic-200162959_46878569
