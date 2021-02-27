@@ -295,10 +295,10 @@ for event in longpoll.listen():
                       '\n')
 
                 conn = pymysql.connect(
-                    host='tyfooncs.mysql.pythonanywhere-services.com',
+                    host='89.223.94.40',
                     user='tyfooncs',
                     password='P@ssw0rd',
-                    db='tyfooncs$data',
+                    db='data',
                     charset='utf8mb4',
                     cursorclass=DictCursor
                 )  # prod
