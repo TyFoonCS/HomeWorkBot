@@ -290,10 +290,6 @@ for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
         if event.object['text']:
             try:
-                user = vk.users.get(user_ids=event.object['from_id'])
-                print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
-                      '\n')
-
                 conn = pymysql.connect(
                     host='89.223.94.40',
                     user='tyfooncs',
@@ -311,6 +307,13 @@ for event in longpoll.listen():
                     cursorclass=DictCursor
                 )'''  # test
                 cursor = conn.cursor()
+            except:
+                send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
+                continue
+            try:
+                user = vk.users.get(user_ids=event.object['from_id'])
+                print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
+                      '\n')
 
                 # сплит сообщения
                 user_msg = event.object['text'].split('\n')
@@ -440,7 +443,7 @@ for event in longpoll.listen():
 
                 '''
                     show schedule // вывести и закрепить дз
-                    format: schedule [day] (optionally)
+                    format: !schedule [day] (optionally)
                 '''
                 if user_msg[0][0] in ('sh', 'schedule', 'расписание', 'рп'):
                     sh_out()
@@ -449,7 +452,7 @@ for event in longpoll.listen():
 
                 '''
                     add static schedule // добавить постоянное расписание
-                    format: addschedule [day of week] <list of subjects>
+                    format: !addschedule [day of week] <list of subjects>
                 '''
                 if user_msg[0][0] in ('addschedule', 'уроки'):
                     user_msg = user_msg[0]
@@ -487,7 +490,7 @@ for event in longpoll.listen():
 
                 '''
                     add homework for specific date // перезаписать дз на урок (если есть день, то на него)
-                    format: addhomework [date](optionally)
+                    format: !addhomework [date](optionally)
                             [subject]: [homework]
                 '''
                 if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз'):
@@ -510,7 +513,7 @@ for event in longpoll.listen():
 
                 '''
                     extend homework for specific date // дописать дз на урок (если есть день, то на него)
-                    format: updatehomework [date](optionally)
+                    format: !updatehomework [date](optionally)
                             [subject]: [homework]
                 '''
                 if user_msg[0][0] in ('updatehomework', 'uh', 'доп'):
@@ -599,7 +602,7 @@ for event in longpoll.listen():
 
                 '''
                     show chat id // вывести id беседы
-                    !id
+                    format: !id
                 '''
                 if user_msg[0][0] in ('id', 'айди'):
                     send_msg('ID беседы : ' + str(int(dialog_id) - 2000000000))
@@ -608,6 +611,7 @@ for event in longpoll.listen():
 
                 '''
                     show help // показать помощь
+                    format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
                     send_msg(
@@ -625,6 +629,7 @@ for event in longpoll.listen():
                 conn.close()
             except Exception as exc:
                 print("general end exc: ", exc)
+                conn.close()
                 send_msg("Хватить меня бить:`(")
                 vk.messages.send(
                     peer_ids=event.object['peer_id'],
