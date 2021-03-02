@@ -374,7 +374,7 @@ for event in longpoll.listen():
                 if dialog_id in ("167849130", "182293940"):
                     '''
                         !db // database manage
-                        format: !db <request>
+                        format: !db [request]
                     '''
                     if user_msg[0][0] == 'db':
                         req = ' '.join(user_msg[0][1:])
@@ -386,7 +386,7 @@ for event in longpoll.listen():
 
                     '''
                         !sc // send to some chat
-                        format: !sc <chat_id without 2000....> <msg>
+                        format: !sc [chat_id without 2000....] [msg]
                     '''
                     if user_msg[0][0] == 'sc':
                         chat_id = 2000000000 + int(user_msg[0][1])
@@ -400,7 +400,7 @@ for event in longpoll.listen():
 
                     '''
                         !new // new bot chat authorization
-                        format: !new <<chat_id without 2000....>
+                        format: !new [chat_id without 2000....]
                     '''
                     if user_msg[0][0] == 'new':
                         chat_id = 2000000000 + int(user_msg[0][1])
@@ -418,7 +418,7 @@ for event in longpoll.listen():
 
                     '''
                         !spam // send msg to all
-                        format: !spam <msg>
+                        format: !spam [msg]
                     '''
                     if user_msg[0][0] == 'spam':
                         cursor.execute('select id from dialogs')
@@ -608,6 +608,10 @@ for event in longpoll.listen():
                             conn.close()
                             continue
 
+                '''
+                    clean specific day // очистить дз на определенный день
+                    format: !clean [day]
+                '''
                 if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть'):
                     cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                     lessons_l = cursor.fetchall()
