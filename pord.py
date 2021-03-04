@@ -13,12 +13,18 @@ import json
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(
-    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
-'''vk_session = vk_api.VkApi(
-    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')'''  # test
-group_id = 200162959  # prod
-# group_id = 202164385  # test
+prod = False  # True - prod, False - test
+if prod:
+    vk_session = vk_api.VkApi(
+        token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+    group_id = 200162959  # prod
+    dbname = 'data'
+else:
+    vk_session = vk_api.VkApi(
+        token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')  # test
+    group_id = 202164385  # test
+    dbname = 'kakaha'
+
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
 longpoll = MyVkLongPoll(vk_session, str(group_id))
@@ -180,18 +186,16 @@ def add_hw(user_msg, day, lessons_l):
                     continue
                 subject = words[0].capitalize()
                 hw[subject] = ' '.join(words[1:]) + '-i-'
-        else: # запись дз на следующий урок
+        else:  # запись дз на следующий урок
             # k - счетчик для определения первой записи на следующий урок. На день урока с k=1 будет прикреплены фото.
-            k = 1
-            for words in user_msg:
-                k += 1
+            for k, words in enumerate(user_msg):
                 # день следующего урока
                 current = now_day
                 # индиктор смены дня
                 new_current = False
                 words = words.split()
                 # список дней, по которым идет этот урок
-                lesson_days= []
+                lesson_days = []
                 print('words: ', words)
                 # определение дней по которым идет урок
                 for day in schedule_days.keys():
@@ -210,7 +214,7 @@ def add_hw(user_msg, day, lessons_l):
                             current = i
                             break
                 # определения дня для записи фото
-                if k == 1:
+                if k == 0:
                     photo_day = current
                 # запись дз на следующий урок
                 cursor.execute(f'select hw from {"hw" + dialog_id} where id="{current}"')
@@ -319,20 +323,13 @@ for event in longpoll.listen():
                     host='89.223.94.40',
                     user='tyfooncs',
                     password='P@ssw0rd',
-                    db='data',
+                    db=dbname,
                     charset='utf8mb4',
                     cursorclass=DictCursor
-                )  # prod
-                '''conn = pymysql.connect(
-                    host='FoonGlot.mysql.pythonanywhere-services.com',
-                    user='FoonGlot',
-                    password='P@ssw0rd',
-                    db='FoonGlot$data',
-                    charset='utf8mb4',
-                    cursorclass=DictCursor
-                )'''  # test
+                )
                 cursor = conn.cursor()
-            except Exception:
+            except Exception as e:
+                print(e)
                 send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
                 continue
             try:
@@ -529,8 +526,7 @@ for event in longpoll.listen():
                         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                         lessons_l = cursor.fetchall()
                         if lessons_l:
-                            ah = add_hw(user_msg, day, lessons_l)
-                            not_sh_out = ah[1]
+                            ah, not_sh_out = add_hw(user_msg, day, lessons_l)
                             if not_sh_out:
                                 send_msg("Записал")
                                 conn.close()
