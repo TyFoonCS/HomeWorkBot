@@ -13,12 +13,12 @@ import json
 
 session = requests.Session()
 
-vk_session = vk_api.VkApi(
-    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
 '''vk_session = vk_api.VkApi(
-    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')'''  # test
-group_id = 200162959  # prod
-# group_id = 202164385  # test
+    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')'''  # prod
+vk_session = vk_api.VkApi(
+    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')  # test
+# group_id = 200162959  # prod
+group_id = 202164385  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
 longpoll = MyVkLongPoll(vk_session, str(group_id))
@@ -77,12 +77,11 @@ def sh_out():
 
         # запись расписания + дз в text
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-        lessons = cursor.fetchall()
-        lessons = json.loads(lessons[0]['lessons'])
+        lessons_l = json.loads(cursor.fetchall()[0]['lessons'])
 
         print("data", data)
         text = name_day[str(day)] + '\n'
-        for i, key in enumerate(lessons):
+        for i, key in enumerate(lessons_l):
             corrrect_data = '\n'.join(data[key].split('-i-')[:-1])
             text += str(i + 1) + '. ' + key + ': ' + corrrect_data + '\n'
         text += 'Остальное ДЗ:\n'
@@ -103,7 +102,6 @@ def sh_out():
         # закрепление или вывод расписания
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
-        # че за конв я не понимаю
         if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) + 1 < 7 else 1):
             # редактирование старого дз
             try:
@@ -132,11 +130,11 @@ def sh_out():
     # в таблице нет дз
     else:
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-        schedule = cursor.fetchall()
-        if schedule:
-            schedule = json.loads(schedule[0]['lessons'])
+        lessons_l = cursor.fetchall()
+        if lessons_l:
+            lessons_l = json.loads(lessons_l[0]['lessons'])
             text = ''
-            for i, lesson in enumerate(schedule):
+            for i, lesson in enumerate(lessons_l):
                 text += str(i + 1) + '. ' + lesson + '\n'
             send_msg(text)
         else:
@@ -270,6 +268,51 @@ def add_hw(user_msg, day, lessons_l):
     return hw, next_write
 
 
+def upd_hw(user_msg, day, lessons_l, hw):
+    # дополнение дз
+    if user_msg[0]:
+        hw = json.loads(hw[0]['hw'])
+        lessons_l = json.loads(lessons_l[0]['lessons'])
+        print("now: ", lessons_l)
+        for i in user_msg:
+            i = i.split()
+            print("i", i)
+            if i[0].capitalize() not in lessons_l:
+                hw['kucha'] += ' '.join(i) + '-i-'
+                continue
+            subject = i[0].capitalize()
+            if i[1:]:
+                hw[subject] += ' '.join(i[1:]) + '-i-'
+        print("dict", hw)
+
+        hw = conn.escape(str(json.dumps(hw)))
+
+        cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
+        conn.commit()
+    # дополнение фото
+    attach = None
+    if event.object['attachments']:
+        attach = download_attach()  # list
+    if attach:
+        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+        old_att = cursor.fetchall()[0]['schedule']
+        if old_att != 'gg':
+            old_att = json.loads(old_att)
+            print(type(old_att), type(attach))
+            attach = str(json.dumps(old_att + attach))
+        else:
+            attach = str(json.dumps(attach))
+        attach = conn.escape(attach)
+        if old_att:
+            cursor.execute(
+                f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
+            conn.commit()
+        else:
+            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
+            conn.commit()
+    return hw
+
+
 # скачивание и загрузка обратно
 def download_attach():
     size_letters = "smxyzw"
@@ -315,22 +358,22 @@ for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
         if event.object['text']:
             try:
-                conn = pymysql.connect(
+                '''conn = pymysql.connect(
                     host='89.223.94.40',
                     user='tyfooncs',
                     password='P@ssw0rd',
                     db='data',
                     charset='utf8mb4',
                     cursorclass=DictCursor
-                )  # prod
-                '''conn = pymysql.connect(
+                )'''  # prod
+                conn = pymysql.connect(
                     host='FoonGlot.mysql.pythonanywhere-services.com',
                     user='FoonGlot',
                     password='P@ssw0rd',
                     db='FoonGlot$data',
                     charset='utf8mb4',
                     cursorclass=DictCursor
-                )'''  # test
+                )  # test
                 cursor = conn.cursor()
             except Exception:
                 send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
@@ -552,53 +595,12 @@ for event in longpoll.listen():
                         user_msg[0] = ' '.join(user_msg[0][1:])
 
                         cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-                        lessons = cursor.fetchall()
+                        hw = cursor.fetchall()
                         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                        schedule_now = cursor.fetchall()
-                        schedule_now = json.loads(schedule_now[0]['lessons'])
+                        lessons_l = cursor.fetchall()
 
-                        if lessons and schedule_now:
-                            # дополнение дз
-                            if user_msg[0]:
-                                lessons = json.loads(lessons[0]['hw'])
-                                print("now: ", schedule_now)
-                                for i in user_msg:
-                                    i = i.split()
-                                    print("i", i)
-                                    if i[0].capitalize() not in schedule_now:
-                                        lessons['kucha'] += ' '.join(i) + '-i-'
-                                        continue
-                                    subject = i[0].capitalize()
-                                    if i[1:]:
-                                        lessons[subject] += ' '.join(i[1:]) + '-i-'
-                                print("dict", lessons)
-
-                                lessons = conn.escape(str(json.dumps(lessons)))
-
-                                cursor.execute(f'update {"hw" + dialog_id} set hw={lessons} where id="{day}"')
-                                conn.commit()
-                            # дополнение фото
-                            attach = None
-                            if event.object['attachments']:
-                                attach = download_attach()  # list
-                            if attach:
-                                cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
-                                old_att = cursor.fetchall()[0]['schedule']
-                                if old_att != 'gg':
-                                    old_att = json.loads(old_att)
-                                    print(type(old_att), type(attach))
-                                    attach = str(json.dumps(old_att + attach))
-                                else:
-                                    attach = str(json.dumps(attach))
-                                attach = conn.escape(attach)
-                                if old_att:
-                                    cursor.execute(
-                                        f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
-                                    conn.commit()
-                                else:
-                                    cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
-                                    conn.commit()
-
+                        if hw and lessons_l:
+                            uh = upd_hw(user_msg, day, lessons_l, hw)
                             sh_out()
                             conn.close()
                             continue
