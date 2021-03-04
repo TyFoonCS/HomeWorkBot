@@ -13,12 +13,12 @@ import json
 
 session = requests.Session()
 
-'''vk_session = vk_api.VkApi(
-    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')'''  # prod
 vk_session = vk_api.VkApi(
-    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')  # test
-# group_id = 200162959  # prod
-group_id = 202164385  # test
+    token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
+'''vk_session = vk_api.VkApi(
+    token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')'''  # test
+group_id = 200162959  # prod
+# group_id = 202164385  # test
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
 longpoll = MyVkLongPoll(vk_session, str(group_id))
@@ -358,22 +358,22 @@ for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
         if event.object['text']:
             try:
-                '''conn = pymysql.connect(
+                conn = pymysql.connect(
                     host='89.223.94.40',
                     user='tyfooncs',
                     password='P@ssw0rd',
                     db='data',
                     charset='utf8mb4',
                     cursorclass=DictCursor
-                )'''  # prod
-                conn = pymysql.connect(
+                )  # prod
+                '''conn = pymysql.connect(
                     host='FoonGlot.mysql.pythonanywhere-services.com',
                     user='FoonGlot',
                     password='P@ssw0rd',
                     db='FoonGlot$data',
                     charset='utf8mb4',
                     cursorclass=DictCursor
-                )  # test
+                )'''  # test
                 cursor = conn.cursor()
             except Exception:
                 send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
