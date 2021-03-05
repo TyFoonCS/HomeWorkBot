@@ -4,7 +4,6 @@ import vk_api
 import pytz
 from datetime import datetime
 from MyLongPoll import MyVkLongPoll
-# from data import db
 from vk_api import VkUpload
 from vk_api.bot_longpoll import VkBotEventType
 import pymysql
@@ -13,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = False  # True - prod, False - test
+prod = True  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -332,7 +331,7 @@ def download_attach():
             if now > max_size:
                 max_size = now
                 ph_url = size['url']
-        with open('img.jpg', 'wb+') as ph_file:
+        with open('img.jpg', 'wb') as ph_file:
             ph_file.write(requests.get(ph_url).content)
         photo = upload.photo_messages(photos=open('img.jpg', 'rb'), peer_id=event.object['peer_id'])[0]
         attach.append(f"photo{photo['owner_id']}_{photo['id']}")
