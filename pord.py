@@ -147,44 +147,54 @@ def sh_out():
                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 
-def add_hw(user_msg, day, lessons_l):
+def get_schedules():
+    schedule_days = {}
+    for i in range(1, 7):
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{i}"')
+        schedule_days[str(i)] = json.loads(cursor.fetchall()[0]['lessons'])
+    return schedule_days
+
+
+def add_hw(user_msg, day):
     hw = ''
     photo_day = False
     next_write = False
+    kucha = ''
     if user_msg[0]:
-        lessons_l = json.loads(lessons_l[0]['lessons'])
 
-        # достать дз из бд
-        cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-        old_hw = cursor.fetchall()
-        if old_hw:
-            hw = json.loads(old_hw[0]['hw'])
-        else:
-            hw = dict()
-            for key in lessons_l:
-                hw[key] = ''
-            hw['kucha'] = ''
+        if user_day:  # запись дз на день недели
+            # есть ли расписание
+            cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+            lessons_l = cursor.fetchall()
+            if lessons_l:
+                lessons_l = json.loads(lessons_l[0]['lessons'])
+                # достать дз из бд
+                cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+                old_hw = cursor.fetchall()
+                if old_hw:
+                    hw = json.loads(old_hw[0]['hw'])
+                else:
+                    hw = dict()
+                    for key in lessons_l:
+                        hw[key] = ''
+                    hw['kucha'] = ''
 
-        # расписание по дням
-        schedule_days = {}
-        for i in range(1, 7):
-            cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{i}"')
-            schedule_days[str(i)] = json.loads(cursor.fetchall()[0]['lessons'])
-
-        # обработка сообщения
-        kucha = ''
-        # запись дз на день недели
-        if user_day:
-            for words in user_msg:
-                words = words.split()
-                print('words: ', words)
-                if words[0].capitalize() not in lessons_l:
-                    kucha += ' '.join(words) + '-i-'
-                    continue
-                subject = words[0].capitalize()
-                hw[subject] = ' '.join(words[1:]) + '-i-'
+                for words in user_msg:
+                    words = words.split()
+                    print('words: ', words)
+                    if words[0].capitalize() not in lessons_l:
+                        kucha += ' '.join(words) + '-i-'
+                        continue
+                    subject = words[0].capitalize()
+                    hw[subject] = ' '.join(words[1:]) + '-i-'
+            else:
+                send_msg(
+                    "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
         else:  # запись дз на следующий урок
-            # k - счетчик для определения первой записи на следующий урок. На день урока с k=1 будет прикреплены фото.
+            # дни, на которые будет перезаписана домашка
+            rewritten_days = []
+            # расписание по дням
+            schedule_days = get_schedules()
             for k, words in enumerate(user_msg):
                 # день следующего урока
                 current = now_day
@@ -199,7 +209,6 @@ def add_hw(user_msg, day, lessons_l):
                     if words[0].capitalize() in schedule_days[day]:
                         lesson_days.append(int(day))
                 # выбор дня ближайшего урока
-                print(lesson_days, current)
                 for i in lesson_days:
                     if i > current:
                         current = i
@@ -210,6 +219,7 @@ def add_hw(user_msg, day, lessons_l):
                         if i < current:
                             current = i
                             break
+                rewritten_days.append(current)
                 # определения дня для записи фото
                 if k == 0:
                     photo_day = current
@@ -223,7 +233,9 @@ def add_hw(user_msg, day, lessons_l):
                     cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
                     conn.commit()
             # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
-            next_write = True
+            print("here: ", rewritten_days, day)
+            if day in rewritten_days:
+                next_write = True
 
         if kucha and user_day:
             hw['kucha'] = kucha
@@ -273,25 +285,26 @@ def add_hw(user_msg, day, lessons_l):
 
 def upd_hw(user_msg, day, lessons_l, hw):
     # дополнение дз
+    photo_day = False
+    next_write = False
     if user_msg[0]:
-        hw = json.loads(hw[0]['hw'])
-        lessons_l = json.loads(lessons_l[0]['lessons'])
-        print("now: ", lessons_l)
-        for i in user_msg:
-            i = i.split()
-            print("i", i)
-            if i[0].capitalize() not in lessons_l:
-                hw['kucha'] += ' '.join(i) + '-i-'
-                continue
-            subject = i[0].capitalize()
-            if i[1:]:
-                hw[subject] += ' '.join(i[1:]) + '-i-'
-        print("dict", hw)
-
-        hw = conn.escape(str(json.dumps(hw)))
-
-        cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
-        conn.commit()
+        if user_day:
+            hw = json.loads(hw[0]['hw'])
+            lessons_l = json.loads(lessons_l[0]['lessons'])
+            print("now: ", lessons_l)
+            for i in user_msg:
+                i = i.split()
+                print("i", i)
+                if i[0].capitalize() not in lessons_l:
+                    hw['kucha'] += ' '.join(i) + '-i-'
+                    continue
+                subject = i[0].capitalize()
+                if i[1:]:
+                    hw[subject] += ' '.join(i[1:]) + '-i-'
+            print("dict", hw)
+            hw = conn.escape(str(json.dumps(hw)))
+            cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
+            conn.commit()
     # дополнение фото
     attach = None
     if event.object['attachments']:
@@ -563,20 +576,12 @@ for event in longpoll.listen():
                 if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз'):
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
-
-                        # есть ли расписание
-                        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                        lessons_l = cursor.fetchall()
-                        if lessons_l:
-                            ah, not_sh_out = add_hw(user_msg, day, lessons_l)
-                            if not_sh_out:
-                                send_msg("Записал")
-                                conn.close()
-                                continue
-                            sh_out()
-                        else:
-                            send_msg(
-                                "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                        ah, not_sh_out = add_hw(user_msg, day)
+                        if not_sh_out:
+                            send_msg("Записал")
+                            conn.close()
+                            continue
+                        sh_out()
                         conn.close()
                         continue
 
