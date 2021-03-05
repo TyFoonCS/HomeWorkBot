@@ -159,11 +159,10 @@ def add_hw(user_msg, day):
     hw = ''
     photo_day = False
     next_write = False
-    kucha = ''
     if user_msg[0]:
-
         if user_day:  # запись дз на день недели
             # есть ли расписание
+            kucha = ''
             cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
             lessons_l = cursor.fetchall()
             if lessons_l:
@@ -177,7 +176,6 @@ def add_hw(user_msg, day):
                     hw = dict()
                     for key in lessons_l:
                         hw[key] = ''
-                    hw['kucha'] = ''
 
                 for words in user_msg:
                     words = words.split()
@@ -187,13 +185,7 @@ def add_hw(user_msg, day):
                         continue
                     subject = words[0].capitalize()
                     hw[subject] = ' '.join(words[1:]) + '-i-'
-                # работа с кучей
-                if kucha:
-                    hw['kucha'] = kucha
-                    cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
-                    if cursor.fetchall():
-                        cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
-                        conn.commit()
+
                 # запись дз на день
                 hw = conn.escape(str(json.dumps(hw)))
                 if old_hw:
@@ -210,6 +202,7 @@ def add_hw(user_msg, day):
             rewritten_days = []
             # расписание по дням
             schedule_days = get_schedules()
+            kucha = []
             for k, words in enumerate(user_msg):
                 # день следующего урока
                 current = now_day
@@ -223,6 +216,10 @@ def add_hw(user_msg, day):
                 for day in schedule_days.keys():
                     if words[0].capitalize() in schedule_days[day]:
                         lesson_days.append(int(day))
+
+                if not lesson_days:
+                    kucha.append(words)
+                    continue
                 # выбор дня ближайшего урока
                 for i in lesson_days:
                     if i > current:
@@ -250,6 +247,17 @@ def add_hw(user_msg, day):
             # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
             if day in rewritten_days:
                 next_write = True
+
+        # работа с кучей
+        if kucha:
+            if isinstance(kucha, list):
+                kucha = '\n'.join([' '.join(i) for i in kucha])
+            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+            hw_kucha = json.loads(cursor.fetchall()[0]['hw'])
+            hw_kucha['kucha'] = kucha
+            hw_kucha = conn.escape(json.dumps(hw_kucha))
+            cursor.execute(f'update {"hw" + dialog_id} set hw={hw_kucha} where id="{day}"')
+            conn.commit()
 
     # определение дня для записи фото
     if not photo_day:
