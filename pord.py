@@ -187,6 +187,21 @@ def add_hw(user_msg, day):
                         continue
                     subject = words[0].capitalize()
                     hw[subject] = ' '.join(words[1:]) + '-i-'
+                # работа с кучей
+                if kucha:
+                    hw['kucha'] = kucha
+                    cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+                    if cursor.fetchall():
+                        cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
+                        conn.commit()
+                # запись дз на день
+                hw = conn.escape(str(json.dumps(hw)))
+                if old_hw:
+                    cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
+                else:
+                    cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
+                conn.commit()
+
             else:
                 send_msg(
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
@@ -233,23 +248,8 @@ def add_hw(user_msg, day):
                     cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
                     conn.commit()
             # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
-            print("here: ", rewritten_days, day)
             if day in rewritten_days:
                 next_write = True
-
-        if kucha and user_day:
-            hw['kucha'] = kucha
-            cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
-            if cursor.fetchall():
-                cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
-                conn.commit()
-        if user_day:
-            hw = conn.escape(str(json.dumps(hw)))
-            if old_hw:
-                cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
-            else:
-                cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
-            conn.commit()
 
     # определение дня для записи фото
     if not photo_day:
