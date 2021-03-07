@@ -136,11 +136,14 @@ def sh_out():
         send_msg(
             "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
+
 def get_schedules():
     schedule_days = {}
     for i in range(1, 7):
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{i}"')
-        schedule_days[str(i)] = json.loads(cursor.fetchall()[0]['lessons'])
+        data = cursor.fetchall()
+        if data:
+            schedule_days[str(i)] = json.loads(data[0]['lessons'])
     return schedule_days
 
 
@@ -219,7 +222,6 @@ def do_kucha(day, kucha, mode):
 
 
 def add_hw(user_msg, day):
-    hw = ''
     photo_day = False
     next_write = False
     if user_msg[0]:
@@ -516,7 +518,7 @@ for event in longpoll.listen():
                 print("DAAAAY: " + str(day))
 
                 # авторизация по peer_id в таблице
-                cursor.execute('select * from dialogs')
+                '''cursor.execute('select * from dialogs')
                 ids = cursor.fetchall()
                 auth_bot = False
                 for now_id in ids:
@@ -526,9 +528,21 @@ for event in longpoll.listen():
                 if not auth_bot:
                     send_msg("Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
                     conn.close()
-                    continue
-
+                    continue'''
                 # -------------------------------
+
+                # автоматическая добавка новой беседы в БД
+                # + проверка на личку
+                if int(dialog_id) - 2000000000 > 0:
+                    cursor.execute(f'select id from dialogs where id="{int(dialog_id)}"')
+                    if not cursor.fetchall():
+                        cursor.execute(f'insert into dialogs values("{int(dialog_id)}", NULL)')
+                        cursor.execute(f'create table {"sh" + str(int(dialog_id))} (id integer, lessons text)')
+                        cursor.execute(
+                            f'create table {"hw" + str(int(dialog_id))} (id integer, schedule text, hw text)')
+                else:
+                    send_msg("В личике пока не обслуживаем")
+                # -----------------------------------------
 
                 user_msg[0][0] = user_msg[0][0].lower()
 
