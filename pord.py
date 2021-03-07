@@ -132,20 +132,9 @@ def sh_out():
                     conn.commit()
         else:
             send_msg(text, attach)
-    # в таблице нет дз
     else:
-        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-        lessons_l = cursor.fetchall()
-        if lessons_l:
-            lessons_l = json.loads(lessons_l[0]['lessons'])
-            text = ''
-            for i, lesson in enumerate(lessons_l):
-                text += str(i + 1) + '. ' + lesson + '\n'
-            send_msg(text)
-        else:
-            send_msg(
-                "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
-
+        send_msg(
+            "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 def get_schedules():
     schedule_days = {}
@@ -243,13 +232,7 @@ def add_hw(user_msg, day):
                 lessons_l = json.loads(lessons_l[0]['lessons'])
                 # достать дз из бд
                 cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-                old_hw = cursor.fetchall()
-                if old_hw:
-                    hw = json.loads(old_hw[0]['hw'])
-                else:
-                    hw = dict()
-                    for key in lessons_l:
-                        hw[key] = ''
+                hw = json.loads(cursor.fetchall()[0]['hw'])
 
                 for words in user_msg:
                     words = words.split()
@@ -261,10 +244,7 @@ def add_hw(user_msg, day):
                     hw[subject] = ' '.join(words[1:]) + '-i-'
                 # запись дз на день
                 hw = conn.escape(str(json.dumps(hw)))
-                if old_hw:
-                    cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
-                else:
-                    cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
+                cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
                 conn.commit()
 
             else:
@@ -288,25 +268,19 @@ def add_hw(user_msg, day):
         attach = conn.escape(str(json.dumps(attach)))
 
         # чистка кучи в случае отсутствия текста
-        if not user_msg[0]:
+        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{photo_day}"')
+        if not user_msg[0] and cursor.fetchall():
             cursor.execute(f'select hw from {"hw" + dialog_id} where id="{photo_day}"')
-            hw_now = cursor.fetchall()
-            if hw_now:
-                hw_now = json.loads(str(hw_now[0]['hw']))
+            hw_now = json.loads(str(cursor.fetchall()[0]['hw']))
 
             hw_now['kucha'] = ''
             hw_now = conn.escape(str(json.dumps(hw_now)))
             cursor.execute(f'update {"hw" + dialog_id} set hw={hw_now} where id="{photo_day}"')
-            conn.commit()
+            # conn.commit() !!!
         # ------------
-
-        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{photo_day}"')
-        if cursor.fetchall():
-            cursor.execute(f'update {"hw" + dialog_id} set schedule={attach} where id="{photo_day}"')
-        else:
-            cursor.execute(f'insert into {"hw" + dialog_id} values ("{photo_day}", "gg", "")')
+        cursor.execute(f'update {"hw" + dialog_id} set schedule={attach} where id="{photo_day}"')
         conn.commit()
-    return hw, next_write
+    return next_write
 
 
 # дополнение дз
@@ -575,36 +549,23 @@ for event in longpoll.listen():
                     user_msg = user_msg[0]
                     if len(user_msg) > 2:
                         lessons = [i.capitalize() for i in user_msg[1:]]
+                        lessons = str(json.dumps(lessons))
 
                         # обновление sh таблицы
                         cursor.execute(f'select * from {"sh" + dialog_id} where id="{day}"')
                         if cursor.fetchall():
                             cursor.execute(
-                                f'update {"sh" + dialog_id} set lessons={conn.escape(str(json.dumps(lessons)))} where id="{day}"')
-
-                        # обновление hw таблицы
-                        cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
-                        if cursor.fetchall():
-                            if len(user_msg) > 1:
-                                cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                                lessons_l = cursor.fetchall()
-                                if lessons_l:
-                                    text = add_hw(user_msg[1:], day, lessons_l)[0]
-                                    if not text:
-                                        send_msg("Не прикладывайте картинку.")
-                                        conn.close()
-                                        continue
-                                    cursor.execute(f'update {"hw" + dialog_id} set hw="{text}" where id="{day}"')
+                                f'update {"sh" + dialog_id} set lessons={conn.escape(lessons)} where id="{day}"')
                         else:
                             cursor.execute(
-                                f'insert into {"sh" + dialog_id} values("{day}", {conn.escape(str(json.dumps(lessons)))})')
+                                f'insert into {"sh" + dialog_id} values("{day}", {conn.escape(lessons)})')
                             conn.commit()
-
-                        schedule_now = name_day[str(now_day)] + ''.join(
-                            [f'\n{n + 1}. {i}' for n, i in enumerate(lessons)])
-                        send_msg(schedule_now)
-                        conn.close()
-                        continue
+                        # заполнение таблицы hw
+                        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                        clean(day, cursor.fetchall())
+                        sh_out()
+                    conn.close()
+                    continue
 
                 '''
                     add homework for specific date // перезаписать дз на урок (если есть день, то на него)
@@ -614,7 +575,7 @@ for event in longpoll.listen():
                 if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз'):
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
-                        ah, not_sh_out = add_hw(user_msg, day)
+                        not_sh_out = add_hw(user_msg, day)
                         if not_sh_out:
                             send_msg("Записал")
                             conn.close()
@@ -638,7 +599,7 @@ for event in longpoll.listen():
                         lessons_l = cursor.fetchall()
 
                         if hw and lessons_l:
-                            uh = upd_hw(user_msg, day, lessons_l, hw)
+                            upd_hw(user_msg, day, lessons_l, hw)
                             sh_out()
                             conn.close()
                             continue
