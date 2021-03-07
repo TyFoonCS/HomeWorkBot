@@ -155,6 +155,80 @@ def get_schedules():
     return schedule_days
 
 
+def to_next_lesson(day, mode):
+    # день для фото
+    photo_day = False
+    # индикатор записи на следующий урок
+    next_write = False
+    # дни, на которые будет перезаписана домашка
+    rewritten_days = []
+    # расписание по дням
+    schedule_days = get_schedules()
+    kucha = []
+    for k, words in enumerate(user_msg):
+        # день следующего урока
+        current = now_day
+        # индиктор смены дня
+        new_current = False
+        words = words.split()
+        # список дней, по которым идет этот урок
+        lesson_days = []
+        print('words: ', words)
+        # определение дней по которым идет урок
+        for day in schedule_days.keys():
+            if words[0].capitalize() in schedule_days[day]:
+                lesson_days.append(int(day))
+
+        if not lesson_days:
+            kucha.append(words)
+            continue
+        # выбор дня ближайшего урока
+        for i in lesson_days:
+            if i > current:
+                current = i
+                new_current = True
+                break
+        if not new_current:
+            for i in lesson_days:
+                if i < current:
+                    current = i
+                    break
+        rewritten_days.append(current)
+        # определения дня для записи фото
+        if k == 0:
+            photo_day = current
+        # запись дз на следующий урок
+        cursor.execute(f'select hw from {"hw" + dialog_id} where id="{current}"')
+        select = cursor.fetchall()
+        if select[0]:
+            current_hw = json.loads(select[0]['hw'])
+            if mode == "add_hw":
+                current_hw[words[0].capitalize()] = ' '.join(words[1:]) + '-i-'
+            elif mode == "upd_hw":
+                current_hw[words[0].capitalize()] += ' '.join(words[1:]) + '-i-'
+            current_hw = conn.escape(str(json.dumps(current_hw)))
+            cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
+            conn.commit()
+    # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
+    if day in rewritten_days:
+        next_write = True
+    return photo_day, next_write, kucha
+
+
+def do_kucha(day, kucha, mode):
+    if isinstance(kucha, list):
+        kucha = '\n'.join([' '.join(i) for i in kucha])
+    cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
+    hw_kucha = json.loads(cursor.fetchall()[0]['hw'])
+    if mode == "add_hw":
+        hw_kucha['kucha'] = kucha
+    elif mode == "upd_hw":
+        hw_kucha['kucha'] += '-i-' + kucha
+    hw_kucha = conn.escape(json.dumps(hw_kucha))
+    cursor.execute(f'update {"hw" + dialog_id} set hw={hw_kucha} where id="{day}"')
+    conn.commit()
+
+
 def add_hw(user_msg, day):
     hw = ''
     photo_day = False
@@ -185,7 +259,6 @@ def add_hw(user_msg, day):
                         continue
                     subject = words[0].capitalize()
                     hw[subject] = ' '.join(words[1:]) + '-i-'
-
                 # запись дз на день
                 hw = conn.escape(str(json.dumps(hw)))
                 if old_hw:
@@ -198,66 +271,11 @@ def add_hw(user_msg, day):
                 send_msg(
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
         else:  # запись дз на следующий урок
-            # дни, на которые будет перезаписана домашка
-            rewritten_days = []
-            # расписание по дням
-            schedule_days = get_schedules()
-            kucha = []
-            for k, words in enumerate(user_msg):
-                # день следующего урока
-                current = now_day
-                # индиктор смены дня
-                new_current = False
-                words = words.split()
-                # список дней, по которым идет этот урок
-                lesson_days = []
-                print('words: ', words)
-                # определение дней по которым идет урок
-                for day in schedule_days.keys():
-                    if words[0].capitalize() in schedule_days[day]:
-                        lesson_days.append(int(day))
-
-                if not lesson_days:
-                    kucha.append(words)
-                    continue
-                # выбор дня ближайшего урока
-                for i in lesson_days:
-                    if i > current:
-                        current = i
-                        new_current = True
-                        break
-                if not new_current:
-                    for i in lesson_days:
-                        if i < current:
-                            current = i
-                            break
-                rewritten_days.append(current)
-                # определения дня для записи фото
-                if k == 0:
-                    photo_day = current
-                # запись дз на следующий урок
-                cursor.execute(f'select hw from {"hw" + dialog_id} where id="{current}"')
-                select = cursor.fetchall()
-                if select[0]:
-                    current_hw = json.loads(select[0]['hw'])
-                    current_hw[words[0].capitalize()] = ' '.join(words[1:]) + '-i-'
-                    current_hw = conn.escape(str(json.dumps(current_hw)))
-                    cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
-                    conn.commit()
-            # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
-            if day in rewritten_days:
-                next_write = True
+            photo_day, next_write, kucha = to_next_lesson(day, "add_hw")
 
         # работа с кучей
         if kucha:
-            if isinstance(kucha, list):
-                kucha = '\n'.join([' '.join(i) for i in kucha])
-            cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
-            hw_kucha = json.loads(cursor.fetchall()[0]['hw'])
-            hw_kucha['kucha'] = kucha
-            hw_kucha = conn.escape(json.dumps(hw_kucha))
-            cursor.execute(f'update {"hw" + dialog_id} set hw={hw_kucha} where id="{day}"')
-            conn.commit()
+            do_kucha(day, kucha, "add_hw")
 
     # определение дня для записи фото
     if not photo_day:
@@ -291,10 +309,14 @@ def add_hw(user_msg, day):
     return hw, next_write
 
 
+# дополнение дз
 def upd_hw(user_msg, day, lessons_l, hw):
-    # дополнение дз
+    # день для фото
     photo_day = False
+    # индикатор записи на следующий урок
     next_write = False
+
+    kucha = ''
     if user_msg[0]:
         if user_day:
             hw = json.loads(hw[0]['hw'])
@@ -313,12 +335,22 @@ def upd_hw(user_msg, day, lessons_l, hw):
             hw = conn.escape(str(json.dumps(hw)))
             cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
             conn.commit()
+        else:
+            photo_day, next_write, kucha = to_next_lesson(day, "upd_hw")
+
+        # работа с кучей
+        if kucha:
+            do_kucha(day, kucha, "upd_hw")
+
+    # определение дня для записи фото
+    if not photo_day:
+        photo_day = day
     # дополнение фото
     attach = None
     if event.object['attachments']:
         attach = download_attach()  # list
     if attach:
-        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{day}"')
+        cursor.execute(f'select schedule from {"hw" + dialog_id} where id="{photo_day}"')
         old_att = cursor.fetchall()[0]['schedule']
         if old_att != 'gg':
             old_att = json.loads(old_att)
@@ -329,12 +361,11 @@ def upd_hw(user_msg, day, lessons_l, hw):
         attach = conn.escape(attach)
         if old_att:
             cursor.execute(
-                f'update {"hw" + dialog_id} set schedule={attach} where id="{day}"')
+                f'update {"hw" + dialog_id} set schedule={attach} where id="{photo_day}"')
             conn.commit()
         else:
-            cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", "")')
+            cursor.execute(f'insert into {"hw" + dialog_id} values ("{photo_day}", "gg", "")')
             conn.commit()
-    return hw
 
 
 # скачивание и загрузка обратно
@@ -367,7 +398,6 @@ def clean(day, lessons_l):
         hw[key] = ''
     hw['kucha'] = ''
     hw = conn.escape(str(json.dumps(hw)))  # , ensure_ascii=False
-    # gg
     cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
     if cursor.fetchall():
         cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
