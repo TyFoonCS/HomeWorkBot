@@ -542,7 +542,6 @@ for event in longpoll.listen():
                             f'create table {"hw" + str(int(dialog_id))} (id integer, schedule text, hw text)')
                 else:
                     send_msg("В личке пока не обслуживаем")
-                # -----------------------------------------
 
                 user_msg[0][0] = user_msg[0][0].lower()
 
