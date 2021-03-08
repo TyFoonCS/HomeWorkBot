@@ -13,16 +13,16 @@ import json
 session = requests.Session()
 
 prod = True  # True - prod, False - test
+with open('config.txt', 'r') as config:
+    config = config.read().split('\n')
 if prod:
-    vk_session = vk_api.VkApi(
-        token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
-    group_id = 200162959  # prod
-    dbname = 'data'
+    vk_session = vk_api.VkApi(token=config[0])
+    group_id = int(config[1])
+    dbname = config[2]
 else:
-    vk_session = vk_api.VkApi(
-        token='dfaee6d1e34934d7030c0bcb1d66f7922fd3c855fee5bbbdb389ac54968c28981a58434e03795943ab426')  # test
-    group_id = 202164385  # test
-    dbname = 'kakaha'
+    vk_session = vk_api.VkApi(token=config[3])
+    group_id = int(config[4])
+    dbname = config[5]
 
 vk = vk_session.get_api()
 upload = VkUpload(vk_session)  # Для загрузки изображений
@@ -541,8 +541,7 @@ for event in longpoll.listen():
                         cursor.execute(
                             f'create table {"hw" + str(int(dialog_id))} (id integer, schedule text, hw text)')
                 else:
-                    send_msg("В личике пока не обслуживаем")
-                # -----------------------------------------
+                    send_msg("В личке пока не обслуживаем")
 
                 user_msg[0][0] = user_msg[0][0].lower()
 
@@ -649,19 +648,38 @@ for event in longpoll.listen():
                     continue
 
                 '''
+                    set clean time // установить время автоочистки дз
+                    format: !autoclean [время в формате ЧЧ:ММ]
+                '''
+                if user_msg[0][0] in ('autoclean', 'автоочистка'):
+                    try:
+                        cleantime = (int(i) for i in user_msg[0][1].split(':'))
+                    except ValueError:
+                        send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
+
+                    if len(cleantime) == 2 and 0 <= cleantime[0] <= 23 and cleantime[1] in [0, 30]:
+                        pass  # в кортеже cleantime первый элемент - часы, второй - минуты
+                        # в бд должен идти float со временем, типа 9.3 это 9:30
+
+                    else:
+                        send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
+
+                '''
                     show help // показать помощь
                     format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
                     send_msg(
                         '''Команды и примеры:
-                        https://vk.com/topic-200162959_46878569
+                        https://vk.com/@hosbobot-komandy
                         !День по умолчанию завтрашний, вводить необязательно!
                         расписание [день]
                         уроки [день] <список предметов через пробел>
                         дз [день] <дз>
                         доп [день] <дз>
                         стереть [день]
+                        айди
+                        автоочистка [ЧЧ:ММ]
                         помощь
                         '''
                     )
