@@ -202,7 +202,7 @@ def to_next_lesson(day, mode):
             cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
             conn.commit()
     # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
-    if day in rewritten_days:
+    if day not in rewritten_days:
         next_write = True
     return photo_day, next_write, kucha
 
@@ -342,6 +342,7 @@ def upd_hw(user_msg, day, lessons_l, hw):
         else:
             cursor.execute(f'insert into {"hw" + dialog_id} values ("{photo_day}", "gg", "")')
             conn.commit()
+    return next_write
 
 
 # скачивание и загрузка обратно
@@ -592,9 +593,8 @@ for event in longpoll.listen():
                         not_sh_out = add_hw(user_msg, day)
                         if not_sh_out:
                             send_msg("Записал")
-                            conn.close()
-                            continue
-                        sh_out()
+                        else:
+                            sh_out()
                         conn.close()
                         continue
 
@@ -613,8 +613,11 @@ for event in longpoll.listen():
                         lessons_l = cursor.fetchall()
 
                         if hw and lessons_l:
-                            upd_hw(user_msg, day, lessons_l, hw)
-                            sh_out()
+                            not_sh_out = upd_hw(user_msg, day, lessons_l, hw)
+                            if not_sh_out:
+                                send_msg("Записал")
+                            else:
+                                sh_out()
                             conn.close()
                             continue
                         else:
