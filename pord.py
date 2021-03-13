@@ -664,17 +664,28 @@ for event in longpoll.listen():
                     format: !autoclean [время в формате ЧЧ:ММ]
                 '''
                 if user_msg[0][0] in ('autoclean', 'автоочистка'):
+                    cleantime = ()
                     try:
-                        cleantime = (int(i) for i in user_msg[0][1].split(':'))
+                        if user_msg[0][1] == '-':
+                            # !!!!!удаление из бд времени автоочистки
+                            conn.close()
+                            continue
+                        else:
+                            cleantime = [int(i) for i in user_msg[0][1].split(':')]
                     except ValueError:
                         send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
+                        conn.close()
+                        continue
 
+                    # проверка, что время в нужном формате
                     if len(cleantime) == 2 and 0 <= cleantime[0] <= 23 and cleantime[1] in [0, 30]:
-                        pass  # в кортеже cleantime первый элемент - часы, второй - минуты
-                        # в бд должен идти float со временем, типа 9.3 это 9:30
+                        cleantime = cleantime[0] + cleantime[1] / 100
+                        # !!!!!в бд должен идти cleantime типа float со временем, например 9.3 это 9:30
 
                     else:
-                        send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
+                        send_msg('Неверное время. Время должно быть только в :00 или :30')
+                    conn.close()
+                    continue
 
                 '''
                     show help // показать помощь
