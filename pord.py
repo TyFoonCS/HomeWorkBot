@@ -167,9 +167,9 @@ def to_next_lesson(day, mode):
         lesson_days = []
         print('words: ', words)
         # определение дней по которым идет урок
-        for day in schedule_days.keys():
-            if words[0].capitalize() in schedule_days[day]:
-                lesson_days.append(int(day))
+        for schedule_day in schedule_days.keys():
+            if words[0].capitalize() in schedule_days[schedule_day]:
+                lesson_days.append(int(schedule_day))
 
         if not lesson_days:
             kucha.append(words)
@@ -202,6 +202,7 @@ def to_next_lesson(day, mode):
             cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
             conn.commit()
     # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
+    print(day, schedule_day, rewritten_days)
     if day not in rewritten_days:
         next_write = True
     return photo_day, next_write, kucha
@@ -679,7 +680,7 @@ for event in longpoll.listen():
                     )
 
                 conn.close()
-            except TypeError as exc:
+            except Exception as exc:
                 print("general end exc: ", exc)
                 conn.close()
                 send_msg("Хватить меня бить:`(")
