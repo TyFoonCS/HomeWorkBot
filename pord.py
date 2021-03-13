@@ -258,6 +258,8 @@ def add_hw(user_msg, day):
         # работа с кучей
         if kucha:
             do_kucha(day, kucha, "add_hw")
+            if not user_day:
+                next_write = False
 
     # определение дня для записи фото
     if not photo_day:
@@ -317,6 +319,8 @@ def upd_hw(user_msg, day, lessons_l, hw):
         # работа с кучей
         if kucha:
             do_kucha(day, kucha, "upd_hw")
+            if not user_day:
+                next_write = False
 
     # определение дня для записи фото
     if not photo_day:
@@ -516,6 +520,11 @@ for event in longpoll.listen():
                     day = now_day + 1
                 if day >= 7:
                     day = 1
+                # проверка на пятидневку
+                if day == 6:
+                    cursor.execute(f'select id from {"hw" + dialog_id} where id=6')
+                    if not cursor.fetchall():
+                        day = 1
                 print("DAAAAY: " + str(day))
 
                 # авторизация по peer_id в таблице
@@ -658,19 +667,19 @@ for event in longpoll.listen():
                 if user_msg[0][0] in ('help', 'помощь'):
                     send_msg(
                         '''Команды и примеры:
-                        https://vk.com/topic-200162959_46878569
-                        !День по умолчанию завтрашний, вводить необязательно!
-                        расписание [день]
-                        уроки [день] <список предметов через пробел>
-                        дз [день] <дз>
-                        доп [день] <дз>
-                        стереть [день]
-                        помощь
+                        https://vk.com/@hosbobot-komandy
+                        (День вводить необязательно)
+                        !расписание [день]
+                        !уроки [день] <список предметов через пробел>
+                        !дз [день] <дз>
+                        !доп [день] <дз>
+                        !стереть [день]
+                        !помощь
                         '''
                     )
 
                 conn.close()
-            except Exception as exc:
+            except TypeError as exc:
                 print("general end exc: ", exc)
                 conn.close()
                 send_msg("Хватить меня бить:`(")
