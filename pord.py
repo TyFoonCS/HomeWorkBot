@@ -107,7 +107,7 @@ def sh_out():
         # закрепление или вывод расписания
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
-        if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) + 1 < 7 else 1):
+        if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) < amount_days else 1):
             # редактирование старого дз
             try:
                 if not conv:
@@ -202,7 +202,6 @@ def to_next_lesson(day, mode):
             cursor.execute(f'update {"hw" + dialog_id} set hw={current_hw} where id="{current}"')
             conn.commit()
     # индикатор запсиси дз на следующий урок дня, используется при вызове функции в блоке add homework
-    print(day, schedule_day, rewritten_days)
     if day not in rewritten_days:
         next_write = True
     return photo_day, next_write, kucha
@@ -391,22 +390,23 @@ def clean(day, lessons_l):
 
 
 for event in longpoll.listen():
+    try:
+        conn = pymysql.connect(
+            host='89.223.94.40',
+            user='tyfooncs',
+            password='P@ssw0rd',
+            db=dbname,
+            charset='utf8mb4',
+            cursorclass=DictCursor
+        )
+        cursor = conn.cursor()
+    except Exception as e:
+        print(e)
+        send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
+        continue
     if event.type == VkBotEventType.MESSAGE_NEW:
+        dialog_id = str(event.object['peer_id'])
         if event.object['text']:
-            try:
-                conn = pymysql.connect(
-                    host='89.223.94.40',
-                    user='tyfooncs',
-                    password='P@ssw0rd',
-                    db=dbname,
-                    charset='utf8mb4',
-                    cursorclass=DictCursor
-                )
-                cursor = conn.cursor()
-            except Exception as e:
-                print(e)
-                send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
-                continue
             try:
                 user = vk.users.get(user_ids=event.object['from_id'])
                 print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
@@ -438,8 +438,7 @@ for event in longpoll.listen():
                     conn.close()
                     continue
 
-                # id диалога
-                dialog_id = str(event.object['peer_id'])
+                # id следующего сообщения бота
                 next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
                 # God Mode
@@ -496,11 +495,16 @@ for event in longpoll.listen():
                         cursor.execute('select id from dialogs')
                         ids = [list(i.values())[0] for i in cursor.fetchall()]
                         user_msg[0] = ' '.join(user_msg[0][1:])
+                        attach_wall = None
+                        if 'wall' in user_msg[-1]:
+                            attach_wall = user_msg[-1][user_msg[-1].rfind('wall'):]
+                            user_msg = user_msg[:-1]
                         for chat_id in ids:
                             vk.messages.send(
                                 peer_ids=chat_id,
                                 random_id=random.random(),
-                                message='\n'.join(user_msg)
+                                message='\n'.join(user_msg),
+                                attachment=attach_wall
                             )
                         send_msg("Done Admin!")
 
@@ -521,12 +525,6 @@ for event in longpoll.listen():
                     day = now_day + 1
                 if day >= 7:
                     day = 1
-                # проверка на пятидневку
-                if day == 6:
-                    cursor.execute(f'select id from {"hw" + dialog_id} where id=6')
-                    if not cursor.fetchall():
-                        day = 1
-                print("DAAAAY: " + str(day))
 
                 # авторизация по peer_id в таблице
                 '''cursor.execute('select * from dialogs')
@@ -540,31 +538,10 @@ for event in longpoll.listen():
                     send_msg("Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
                     conn.close()
                     continue'''
-                # -------------------------------
 
-                # автоматическая добавка новой беседы в БД
-                # + проверка на личку
-                if int(dialog_id) - 2000000000 > 0:
-                    cursor.execute(f'select id from dialogs where id="{int(dialog_id)}"')
-                    if not cursor.fetchall():
-                        cursor.execute(f'insert into dialogs values("{int(dialog_id)}", NULL)')
-                        cursor.execute(f'create table {"sh" + str(int(dialog_id))} (id integer, lessons text)')
-                        cursor.execute(
-                            f'create table {"hw" + str(int(dialog_id))} (id integer, schedule text, hw text)')
-                else:
-                    send_msg("В личике пока не обслуживаем")
                 # -----------------------------------------
 
                 user_msg[0][0] = user_msg[0][0].lower()
-
-                '''
-                    show schedule // вывести и закрепить дз
-                    format: !schedule [day] (optionally)
-                '''
-                if user_msg[0][0] in ('sh', 'schedule', 'расписание', 'рп'):
-                    sh_out()
-                    conn.close()
-                    continue
 
                 '''
                     add static schedule // добавить постоянное расписание
@@ -572,7 +549,7 @@ for event in longpoll.listen():
                 '''
                 if user_msg[0][0] in ('addschedule', 'уроки'):
                     user_msg = user_msg[0]
-                    if len(user_msg) > 2:
+                    if len(user_msg) > 2 and user_day:
                         lessons = [i.capitalize() for i in user_msg[1:]]
                         lessons = str(json.dumps(lessons))
 
@@ -589,6 +566,27 @@ for event in longpoll.listen():
                         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                         clean(day, cursor.fetchall())
                         sh_out()
+                    else:
+                        send_msg('Пожалуйста, укажите день')
+                    conn.close()
+                    continue
+
+                # проверка на пятидневку
+                cursor.execute(f'select id from {"hw" + dialog_id} where id=6')
+                if not cursor.fetchall():
+                    amount_days = 5
+                    if day == 6:
+                        day = 1
+                else:
+                    amount_days = 6
+                print("DAAAAY: " + str(day))
+
+                '''
+                    show schedule // вывести и закрепить дз
+                    format: !schedule [day] (optionally)
+                '''
+                if user_msg[0][0] in ('sh', 'schedule', 'расписание', 'рп'):
+                    sh_out()
                     conn.close()
                     continue
 
@@ -691,11 +689,17 @@ for event in longpoll.listen():
                 )
                 continue
 
-        if 'action' in event.object.keys() and event.object['action']['member_id'] == -group_id:
-            vk.messages.send(
-                peer_ids=event.object['peer_id'],
-                random_id=random.random(),
-                sticker_id='21'
-            )
-            send_msg(
-                'Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
+        if 'action' in event.object.keys() and event.object['action']['type'] == 'chat_invite_user' and event.object['action']['member_id'] == -group_id:
+            cursor.execute(f'select id from dialogs where id="{int(dialog_id)}"')
+            if not cursor.fetchall():
+                cursor.execute(f'insert into dialogs values("{int(dialog_id)}", NULL)')
+                cursor.execute(f'create table {"sh" + str(int(dialog_id))} (id integer, lessons text)')
+                cursor.execute(f'create table {"hw" + str(int(dialog_id))} (id integer, schedule text, hw text)')
+                vk.messages.send(
+                    peer_ids=event.object['peer_id'],
+                    random_id=random.random(),
+                    sticker_id='21'
+                )
+                send_msg(
+                    'Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
+            conn.close()
