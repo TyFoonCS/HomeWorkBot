@@ -642,14 +642,15 @@ for event in longpoll.listen():
                     format: !clean [day]
                 '''
                 if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть'):
-                    cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                    lessons_l = cursor.fetchall()
-                    if lessons_l:
-                        clean(day, lessons_l)
-                        sh_out()
-                    else:
-                        send_msg(
-                            "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    if user_day:
+                        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                        lessons_l = cursor.fetchall()
+                        if lessons_l:
+                            clean(day, lessons_l)
+                            sh_out()
+                        else:
+                            send_msg(
+                                "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
                     conn.close()
                     continue
 
