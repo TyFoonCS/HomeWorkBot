@@ -72,7 +72,7 @@ def send_msg(msg, att=''):
 
 
 # вывод расписания с дз
-def sh_out(pin=True):
+def sh_out():
     cursor.execute(f'select hw from {"hw" + dialog_id} where id="{day}"')
     data = cursor.fetchall()
     # дз есть
@@ -105,9 +105,6 @@ def sh_out(pin=True):
                 attach = ','.join(att)
 
         # закрепление или вывод расписания
-        if not pin:
-            send_msg(text, attach)
-            return
         cursor.execute(f'select lessons from {"sh" + dialog_id} where id=-1')
         conv = cursor.fetchall()
         if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) < amount_days else 1):
@@ -528,6 +525,7 @@ for event in longpoll.listen():
                     day = now_day + 1
                 if day >= 7:
                     day = 1
+                amount_days = 6
 
                 # авторизация по peer_id в таблице
                 '''cursor.execute('select * from dialogs')
@@ -568,7 +566,7 @@ for event in longpoll.listen():
                         # заполнение таблицы hw
                         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                         clean(day, cursor.fetchall())
-                        sh_out(pin=False)
+                        sh_out()
                     else:
                         send_msg('Пожалуйста, укажите день')
                     conn.close()
