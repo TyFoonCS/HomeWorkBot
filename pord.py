@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = True  # True - prod, False - test
+prod = False  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -60,6 +60,19 @@ name_day = {
     '5': 'Пятница',
     '6': 'Суббота'
 }
+
+help_msg = '''Статья для начала работы:
+vk.com/@hosbobot-chto-za-bot
+Подробное описание команд:
+vk.com/@hosbobot-komandy
+Список команд:
+!расписание [день]
+!уроки [день] <список предметов через пробел>
+!дз [день] <дз>
+!доп [день] <дз>
+!стереть [день]
+!помощь
+'''
 
 
 def send_msg(msg, att=''):
@@ -666,18 +679,7 @@ for event in longpoll.listen():
                     format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
-                    send_msg(
-                        '''Команды и примеры:
-                        https://vk.com/@hosbobot-komandy
-                        (День вводить необязательно)
-                        !расписание [день]
-                        !уроки [день] <список предметов через пробел>
-                        !дз [день] <дз>
-                        !доп [день] <дз>
-                        !стереть [день]
-                        !помощь
-                        '''
-                    )
+                    send_msg(help_msg)
 
                 conn.close()
             except Exception as exc:
