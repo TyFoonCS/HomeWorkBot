@@ -61,6 +61,19 @@ name_day = {
     '6': 'Суббота'
 }
 
+help_msg = '''Статья для начала работы:
+vk.com/@hosbobot-chto-za-bot
+Подробное описание команд:
+vk.com/@hosbobot-komandy
+Список команд:
+!расписание [день]
+!уроки [день] <список предметов через пробел>
+!дз [день] <дз>
+!доп [день] <дз>
+!стереть [день]
+!помощь
+'''
+
 
 def send_msg(msg, att=''):
     return vk.messages.send(
@@ -666,18 +679,7 @@ for event in longpoll.listen():
                     format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
-                    send_msg(
-                        '''Команды и примеры:
-                        https://vk.com/@hosbobot-komandy
-                        (День вводить необязательно)
-                        !расписание [день]
-                        !уроки [день] <список предметов через пробел>
-                        !дз [день] <дз>
-                        !доп [день] <дз>
-                        !стереть [день]
-                        !помощь
-                        '''
-                    )
+                    send_msg(help_msg)
 
                 conn.close()
             except Exception as exc:
