@@ -520,7 +520,7 @@ def halfanhourclean():
 
 
 x = threading.Thread(target=halfanhourclean)
-x.run()
+x.start()
 
 for event in longpoll.listen():
     try:
@@ -813,8 +813,18 @@ for event in longpoll.listen():
                 if user_msg[0][0] in ('autoclean', 'автоочистка'):
                     cleantime = ()
                     try:
-                        if user_msg[0][1] == '-':
+                        if user_msg[0][1] in ('-', 'off', 'выкл'):
                             # !!!!!удаление из бд времени автоочистки
+                            cursor.execute(f'select data from dialogs where id="{dialog_id}"')
+                            fetch = cursor.fetchall()
+                            if fetch and fetch[0]['data']:
+                                data = json.loads(fetch[0]['data'])
+                                if "cleantime" in data.keys():
+                                    data.pop("cleantime" )
+                                data = conn.escape(str(json.dumps(data)))
+                                cursor.execute(f'update dialogs set data={data} where id="{dialog_id}"')
+                                conn.commit()
+                            send_msg("Отключил автоочистку")
                             conn.close()
                             continue
                         else:
@@ -828,7 +838,16 @@ for event in longpoll.listen():
                     if len(cleantime) == 2 and 0 <= cleantime[0] <= 23 and cleantime[1] in [0, 30]:
                         cleantime = cleantime[0] + cleantime[1] / 100
                         # !!!!!в бд должен идти cleantime типа float со временем, например 9.3 это 9:30
-
+                        cursor.execute(f'select data from dialogs where id="{dialog_id}"')
+                        fetch = cursor.fetchall()
+                        data = dict()
+                        if fetch and fetch[0]['data']:
+                            data = json.loads(fetch[0]['data'])
+                        data['cleantime'] = cleantime
+                        data = conn.escape(str(json.dumps(data)))
+                        cursor.execute(f'update dialogs set data={data} where id="{dialog_id}"')
+                        conn.commit()
+                        send_msg(f"Установил время автоочистки на {user_msg[0][1]}")
                     else:
                         send_msg('Неверное время. Время должно быть только в :00 или :30')
                     conn.close()
