@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = False  # True - prod, False - test
+prod = True  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -436,10 +436,6 @@ for event in longpoll.listen():
                         conn.close()
                         continue
                     user_msg[0] = user_msg[0][1:]
-                if '@all' in user_msg[0]:
-                    send_msg("че орешь на всю беседу!?")
-                    conn.close()
-                    continue
                 if '@' in user_msg[0][0]:
                     conn.close()
                     continue
@@ -462,11 +458,27 @@ for event in longpoll.listen():
                     '''
                     if user_msg[0][0] == 'db':
                         req = ' '.join(user_msg[0][1:])
-                        cursor.execute(req)
-                        conn.commit()
-                        fetch = cursor.fetchall()
-                        fetch = '\n'.join([str(list(i.keys())[0]) + ' : ' + str(i[list(i.keys())[0]]) for i in fetch])
-                        send_msg(f"Done Admin!\n{fetch}")
+                        try:
+                            cursor.execute(req)
+                            conn.commit()
+                        except Exception as exc:
+                            send_msg('Ошибка:\n' + str(exc))
+                            conn.close()
+                            continue
+                        raw_fetch = cursor.fetchall()
+                        if raw_fetch:
+                            fetch = [' '.join(list(raw_fetch[0].keys()))]
+                            for n, i in enumerate(raw_fetch):
+                                fetch.append([])
+                                for j in list(i.keys()):
+                                    if "\\u" in str(i[j]):
+                                        fetch[n+1].append(json.loads(i[j]))
+                                    else:
+                                        fetch[n+1].append(i[j])
+                                fetch[n+1] = ' '.join([str(k) for k in fetch[n+1]])
+                        else:
+                            fetch = raw_fetch
+                        send_msg("Done Admin!\n{}".format('\n'.join(fetch)))
 
                     '''
                         !sc // send to some chat
