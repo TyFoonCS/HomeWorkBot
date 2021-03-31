@@ -64,6 +64,20 @@ name_day = {
     '6': 'Суббота'
 }
 
+help_msg = '''Статья для начала работы:
+vk.com/@hosbobot-chto-za-bot
+Подробное описание команд:
+vk.com/@hosbobot-komandy
+Список команд:
+!расписание [день]
+!уроки [день] <список предметов через пробел>
+!дз [день] <дз>
+!доп [день] <дз>
+!стереть [день]
+!айди
+!помощь
+'''
+
 
 def send_msg(msg, att=''):
     return vk.messages.send(
@@ -542,10 +556,6 @@ for event in longpoll.listen():
                         conn.close()
                         continue
                     user_msg[0] = user_msg[0][1:]
-                if '@all' in user_msg[0]:
-                    send_msg("че орешь на всю беседу!?")
-                    conn.close()
-                    continue
                 if '@' in user_msg[0][0]:
                     conn.close()
                     continue
@@ -568,11 +578,27 @@ for event in longpoll.listen():
                     '''
                     if user_msg[0][0] == 'db':
                         req = ' '.join(user_msg[0][1:])
-                        cursor.execute(req)
-                        conn.commit()
-                        fetch = cursor.fetchall()
-                        fetch = '\n'.join([str(list(i.keys())[0]) + ' : ' + str(i[list(i.keys())[0]]) for i in fetch])
-                        send_msg(f"Done Admin!\n{fetch}")
+                        try:
+                            cursor.execute(req)
+                            conn.commit()
+                        except Exception as exc:
+                            send_msg('Ошибка:\n' + str(exc))
+                            conn.close()
+                            continue
+                        raw_fetch = cursor.fetchall()
+                        if raw_fetch:
+                            fetch = [' '.join(list(raw_fetch[0].keys()))]
+                            for n, i in enumerate(raw_fetch):
+                                fetch.append([])
+                                for j in list(i.keys()):
+                                    if "\\u" in str(i[j]):
+                                        fetch[n+1].append(json.loads(i[j]))
+                                    else:
+                                        fetch[n+1].append(i[j])
+                                fetch[n+1] = ' '.join([str(k) for k in fetch[n+1]])
+                        else:
+                            fetch = raw_fetch
+                        send_msg("Done Admin!\n{}".format('\n'.join(fetch)))
 
                     '''
                         !sc // send to some chat
@@ -644,6 +670,7 @@ for event in longpoll.listen():
                     day = now_day + 1
                 if day >= 7:
                     day = 1
+                amount_days = 6
 
                 # авторизация по peer_id в таблице
                 '''cursor.execute('select * from dialogs')
@@ -758,14 +785,15 @@ for event in longpoll.listen():
                     format: !clean [day]
                 '''
                 if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть'):
-                    cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-                    lessons_l = cursor.fetchall()
-                    if lessons_l:
-                        clean(day, lessons_l)
-                        sh_out()
-                    else:
-                        send_msg(
-                            "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    if user_day:
+                        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
+                        lessons_l = cursor.fetchall()
+                        if lessons_l:
+                            clean(day, lessons_l)
+                            sh_out()
+                        else:
+                            send_msg(
+                                "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
                     conn.close()
                     continue
 
@@ -811,20 +839,7 @@ for event in longpoll.listen():
                     format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
-                    send_msg(
-                        '''Команды и примеры:
-                        https://vk.com/@hosbobot-komandy
-                        (День вводить необязательно)
-                        !расписание [день]
-                        !уроки [день] <список предметов через пробел>
-                        !дз [день] <дз>
-                        !доп [день] <дз>
-                        !стереть [день]
-                        !айди
-                        !автоочистка [ЧЧ:ММ]
-                        !помощь
-                        '''
-                    )
+                    send_msg(help_msg)
 
                 conn.close()
             except Exception as exc:
