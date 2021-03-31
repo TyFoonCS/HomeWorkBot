@@ -409,7 +409,7 @@ def clean(day, lessons_l):
 def planned_clean():
     dt = datetime.now(pytz.timezone('Asia/Dubai'))
     day = datetime.isoweekday(dt)
-    time = float('.'.join((str(i) for i in dt.timetuple()[3:5])))  # время формата ЧЧ.ММ в float (example 9.3 is 9:30)
+    time_now = float('.'.join((str(i) for i in dt.timetuple()[3:5])))
     conn = pymysql.connect(
         host='89.223.94.40',
         user='tyfooncs',
@@ -420,36 +420,36 @@ def planned_clean():
     )
     cursor = conn.cursor()
 
-    # !!!!говно недоделаное
-    cursor.execute(f'')  # селект из конфига
-    dialogs = {}  # словарь: ключ - id диалога, значение - время в формате float
-    # +++++++++++++++++
-
+    cursor.execute(f'select * from dialogs')
+    fetch = cursor.fetchall()
     dialog_toclean = []
-    for dialog_id in dialogs.keys():
-        if dialogs[dialog_id] == time:
-            dialog_toclean.append(dialog_id)
+    for dialog in fetch:
+        if dialog['data']:
+            dialog['data'] = json.loads(dialog['data'])
+            if dialog['data']['cleantime'] and dialog['data']['cleantime'] == time_now:
+                dialog_toclean.append(str(dialog['id']))
+    print('dialogs to clean: ', dialog_toclean)
 
-    for dialog_id in dialog_toclean:
-        cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
-        lessons_l = cursor.fetchall()
-        if lessons_l:
-            lessons_l = json.loads(lessons_l[0]['lessons'])
-            hw = dict()
-            for key in lessons_l:
-                hw[key] = ''
-            hw['kucha'] = ''
-            hw = conn.escape(str(json.dumps(hw)))  # , ensure_ascii=False
-            cursor.execute(f'select * from {"hw" + dialog_id} where id="{day}"')
+    for dialogclean_id in dialog_toclean:
+        cursor.execute(f'select lessons from {"sh" + dialogclean_id} where id="{day}"')
+        lessons_cl = cursor.fetchall()
+        if lessons_cl:
+            lessons_cl = json.loads(lessons_cl[0]['lessons'])
+            hwcl = dict()
+            for key in lessons_cl:
+                hwcl[key] = ''
+            hwcl['kucha'] = ''
+            hwcl = conn.escape(str(json.dumps(hwcl)))  # , ensure_ascii=False
+            cursor.execute(f'select * from {"hw" + dialogclean_id} where id="{day}"')
             if cursor.fetchall():
-                cursor.execute(f'update {"hw" + dialog_id} set hw={hw} where id="{day}"')
-                cursor.execute(f'update {"hw" + dialog_id} set schedule="gg" where id="{day}"')
+                cursor.execute(f'update {"hw" + dialogclean_id} set hw={hwcl} where id="{day}"')
+                cursor.execute(f'update {"hw" + dialogclean_id} set schedule="gg" where id="{day}"')
                 conn.commit()
             else:
-                cursor.execute(f'insert into {"hw" + dialog_id} values ("{day}", "gg", {hw})')
+                cursor.execute(f'insert into {"hw" + dialogclean_id} values ("{day}", "gg", {hwcl})')
                 conn.commit()
             vk.messages.send(
-                peer_ids=dialog_id,
+                peer_ids=dialogclean_id,
                 random_id=random.random(),
                 message='Очистил дз на сегодня'
             )
@@ -814,7 +814,6 @@ for event in longpoll.listen():
                     cleantime = ()
                     try:
                         if user_msg[0][1] in ('-', 'off', 'выкл'):
-                            # !!!!!удаление из бд времени автоочистки
                             cursor.execute(f'select data from dialogs where id="{dialog_id}"')
                             fetch = cursor.fetchall()
                             if fetch and fetch[0]['data']:
@@ -837,7 +836,6 @@ for event in longpoll.listen():
                     # проверка, что время в нужном формате
                     if len(cleantime) == 2 and 0 <= cleantime[0] <= 23 and cleantime[1] in [0, 30]:
                         cleantime = cleantime[0] + cleantime[1] / 100
-                        # !!!!!в бд должен идти cleantime типа float со временем, например 9.3 это 9:30
                         cursor.execute(f'select data from dialogs where id="{dialog_id}"')
                         fetch = cursor.fetchall()
                         data = dict()
