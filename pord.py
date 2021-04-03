@@ -101,7 +101,11 @@ def sh_out():
         text = name_day[str(day)] + '\n'
         for i, key in enumerate(lessons_l):
             corrrect_data = '\n'.join(data[key].split('-i-')[:-1])
+            if data[key]:
+                data[key] = '^^^-i-'
+            print(data, corrrect_data)
             text += str(i + 1) + '. ' + key + ': ' + corrrect_data + '\n'
+
         text += 'Остальное ДЗ:\n'
         kuchka = data['kucha'].split('-i-')
         for k in kuchka:
