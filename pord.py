@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = True  # True - prod, False - test
+prod = False  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -127,7 +127,7 @@ def sh_out():
         if day == now_day or int(day) == ((int(now_day) + 1) if int(now_day) < amount_days else 1):
             # редактирование старого дз
             try:
-                if not conv:
+                if not conv and not personal:
                     raise vk_api.exceptions.ApiError
                 vk.messages.edit(peer_id=event.object['peer_id'],
                                  message=text,
@@ -139,14 +139,15 @@ def sh_out():
             except Exception as exc:
                 print("exc in correct old", exc)
                 send_msg(text, attach)
-                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
-                cursor.execute(f'select * from sh{dialog_id} where id=-1')
-                if cursor.fetchall():
-                    cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
-                    conn.commit()
-                else:
-                    cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
-                    conn.commit()
+                if not personal:
+                    vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
+                    cursor.execute(f'select * from sh{dialog_id} where id=-1')
+                    if cursor.fetchall():
+                        cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
+                        conn.commit()
+                    else:
+                        cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
+                        conn.commit()
         else:
             send_msg(text, attach)
     else:
@@ -422,12 +423,34 @@ for event in longpoll.listen():
         send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
         continue
     if event.type == VkBotEventType.MESSAGE_NEW:
-        dialog_id = str(event.object['peer_id'])
+        dialog_id = int(event.object['peer_id'])
+        personal = False
+        admin = False
+        if dialog_id in ("167849130", "182293940"):
+            admin = True
+        if dialog_id < 2000000000:
+            personal = True
+            cursor.execute(f'select conv from users where user="{dialog_id}"')
+            fetch = cursor.fetchall()
+            print(9, fetch)
+            if fetch and fetch[0]:
+                dialog_id = fetch[0]['conv']
+            else:
+                send_msg("Ты еще не засветился ни в одной классной беседе\nПопробуй написать !рп в беседу своего класса, а потом возвращайся сюда")
+        dialog_id = str(dialog_id)
         if event.object['text']:
             try:
                 user = vk.users.get(user_ids=event.object['from_id'])
                 print('\n', event.object['peer_id'], user[0]['first_name'], user[0]['last_name'], event.object['text'],
                       '\n')
+                if not personal:
+                    from_user = int(event.object['from_id'])
+                    cursor.execute(f'select user from users where user="{from_user}"')
+                    if cursor.fetchall():
+                        cursor.execute(f'update users set conv="{dialog_id}" where user="{from_user}"')
+                    else:
+                        cursor.execute(f'insert into users values ("{from_user}", "{dialog_id}")')
+                    conn.commit()
 
                 # сплит сообщения
                 user_msg = event.object['text'].split('\n')
@@ -455,7 +478,7 @@ for event in longpoll.listen():
                 next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
                 # God Mode
-                if dialog_id in ("167849130", "182293940"):
+                if admin:
                     '''
                         !db // database manage
                         format: !db [request]
@@ -577,7 +600,7 @@ for event in longpoll.listen():
                     add static schedule // добавить постоянное расписание
                     format: !addschedule [day of week] <list of subjects>
                 '''
-                if user_msg[0][0] in ('addschedule', 'уроки'):
+                if user_msg[0][0] in ('addschedule', 'уроки') and not personal:
                     user_msg = user_msg[0]
                     if len(user_msg) > 2 and user_day:
                         lessons = [i.capitalize() for i in user_msg[1:]]
@@ -625,7 +648,7 @@ for event in longpoll.listen():
                     format: !addhomework [date](optionally)
                             [subject]: [homework]
                 '''
-                if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз'):
+                if user_msg[0][0] in ('addhw', 'addhomework', 'ah', 'дз') and not personal:
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
                         not_sh_out = add_hw(user_msg, day)
@@ -641,7 +664,7 @@ for event in longpoll.listen():
                     format: !updatehomework [date](optionally)
                             [subject]: [homework]
                 '''
-                if user_msg[0][0] in ('updatehomework', 'uh', 'доп'):
+                if user_msg[0][0] in ('updatehomework', 'uh', 'доп') and not personal:
                     if len(user_msg[0]) > 1 or event.object['attachments']:
                         user_msg[0] = ' '.join(user_msg[0][1:])
 
@@ -668,7 +691,7 @@ for event in longpoll.listen():
                     clean specific day // очистить дз на определенный день
                     format: !clean [day]
                 '''
-                if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть'):
+                if user_msg[0][0] in ('cl', 'clean', 'чистка', 'стереть') and not personal:
                     if user_day:
                         cursor.execute(f'select lessons from {"sh" + dialog_id} where id="{day}"')
                         lessons_l = cursor.fetchall()
