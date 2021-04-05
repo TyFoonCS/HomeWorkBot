@@ -15,7 +15,7 @@ import json
 
 session = requests.Session()
 
-prod = True  # True - prod, False - test
+prod = False  # True - prod, False - test
 with open('config.txt', 'r') as config:
     config = config.read().split('\n')
 if prod:
@@ -86,6 +86,19 @@ def send_msg(msg, att=''):
         message=msg,
         attachment=att
     )
+
+
+def db_conn():
+    conn = pymysql.connect(
+        host='89.223.94.40',
+        user='tyfooncs',
+        password='P@ssw0rd',
+        db=dbname,
+        charset='utf8mb4',
+        cursorclass=DictCursor
+    )
+    cursor = conn.cursor()
+    return conn, cursor
 
 
 # вывод расписания с дз
@@ -410,15 +423,6 @@ def planned_clean():
     dt = datetime.now(pytz.timezone('Asia/Dubai'))
     day = datetime.isoweekday(dt)
     time_now = float('.'.join((str(i) for i in dt.timetuple()[3:5])))
-    conn = pymysql.connect(
-        host='89.223.94.40',
-        user='tyfooncs',
-        password='P@ssw0rd',
-        db=dbname,
-        charset='utf8mb4',
-        cursorclass=DictCursor
-    )
-    cursor = conn.cursor()
 
     cursor.execute(f'select * from dialogs')
     fetch = cursor.fetchall()
@@ -454,12 +458,10 @@ def planned_clean():
                 message='Очистил дз на сегодня'
             )
 
-    conn.close()
-
 
 def delete_dialog(dialog_id):
     try:
-        vk.messages.removeChatUser(chat_id=dialog_id-2000000000, member_id=-group_id)
+        vk.messages.removeChatUser(chat_id=dialog_id - 2000000000, member_id=-group_id)
     except Exception as exc:
         print(exc)
         return
@@ -468,16 +470,6 @@ def delete_dialog(dialog_id):
 
 
 def check_if_in_dialog():
-    conn = pymysql.connect(
-        host='89.223.94.40',
-        user='tyfooncs',
-        password='P@ssw0rd',
-        db=dbname,
-        charset='utf8mb4',
-        cursorclass=DictCursor
-    )
-    cursor = conn.cursor()
-
     cursor.execute(f'select id from dialogs')
     dialogs_ids = [list(i.values())[0] for i in cursor.fetchall()]
     for dialog_id in dialogs_ids:
@@ -485,7 +477,7 @@ def check_if_in_dialog():
             chat_info = vk.messages.getConversationMembers(peer_id=dialog_id)
         except vk_api.exceptions.ApiError as exc:
             exc = str(exc)
-            if exc[exc.find('[')+1: exc.find(']')] == "917":
+            if exc[exc.find('[') + 1: exc.find(']')] == "917":
                 try:
                     vk.messages.send(
                         peer_id=dialog_id,
@@ -504,11 +496,11 @@ def check_if_in_dialog():
             if chat_info['count'] == 1:
                 delete_dialog(dialog_id)
 
-    conn.close()
-
 
 schedule.every().hour.at(':00').do(planned_clean)
 schedule.every().hour.at(':30').do(planned_clean)
+
+
 # schedule.every().sunday.at('00:00').do(check_if_in_dialog)
 # check_if_in_dialog()
 
@@ -522,21 +514,9 @@ def halfanhourclean():
 x = threading.Thread(target=halfanhourclean)
 x.start()
 
+conn, cursor = db_conn()
+
 for event in longpoll.listen():
-    try:
-        conn = pymysql.connect(
-            host='89.223.94.40',
-            user='tyfooncs',
-            password='P@ssw0rd',
-            db=dbname,
-            charset='utf8mb4',
-            cursorclass=DictCursor
-        )
-        cursor = conn.cursor()
-    except Exception as e:
-        print(e)
-        send_msg("Проблемы с сервером. Мы уже работаем над этой проблемой.")
-        continue
     if event.type == VkBotEventType.MESSAGE_NEW:
         dialog_id = str(event.object['peer_id'])
         if event.object['text']:
@@ -553,18 +533,15 @@ for event in longpoll.listen():
                 if '@hosbobot' in user_msg[0][0]:
                     if len(user_msg[0]) == 1:
                         send_msg(random.choice(empty_req_answers))
-                        conn.close()
                         continue
                     user_msg[0] = user_msg[0][1:]
                 if '@' in user_msg[0][0]:
-                    conn.close()
                     continue
 
                 # проверка на восклицательный знак перед командой
                 if user_msg[0][0][0] == '!':
                     user_msg[0][0] = user_msg[0][0][1:]
                 else:
-                    conn.close()
                     continue
 
                 # id следующего сообщения бота
@@ -583,7 +560,6 @@ for event in longpoll.listen():
                             conn.commit()
                         except Exception as exc:
                             send_msg('Ошибка:\n' + str(exc))
-                            conn.close()
                             continue
                         raw_fetch = cursor.fetchall()
                         if raw_fetch:
@@ -592,10 +568,10 @@ for event in longpoll.listen():
                                 fetch.append([])
                                 for j in list(i.keys()):
                                     if "\\u" in str(i[j]):
-                                        fetch[n+1].append(json.loads(i[j]))
+                                        fetch[n + 1].append(json.loads(i[j]))
                                     else:
-                                        fetch[n+1].append(i[j])
-                                fetch[n+1] = ' '.join([str(k) for k in fetch[n+1]])
+                                        fetch[n + 1].append(i[j])
+                                fetch[n + 1] = ' '.join([str(k) for k in fetch[n + 1]])
                         else:
                             fetch = raw_fetch
                         send_msg("Done Admin!\n{}".format('\n'.join(fetch)))
@@ -624,7 +600,6 @@ for event in longpoll.listen():
                         cursor.execute(f'select id from dialogs where id="{chat_id}"')
                         if cursor.fetchall():
                             send_msg("Эта беседа уже авторизована")
-                            conn.close()
                             continue
                         # создание таблиц для новой беседы
                         cursor.execute(f'insert into dialogs values("{chat_id}", NULL)')
@@ -654,7 +629,6 @@ for event in longpoll.listen():
                         send_msg("Done Admin!")
 
                     # разрыв соединения с БД и конец итерации
-                    conn.close()
                     continue
 
                 # определение дня
@@ -682,7 +656,6 @@ for event in longpoll.listen():
                         break
                 if not auth_bot:
                     send_msg("Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
-                    conn.close()
                     continue'''
 
                 # -----------------------------------------
@@ -714,7 +687,6 @@ for event in longpoll.listen():
                         sh_out()
                     else:
                         send_msg('Пожалуйста, укажите день')
-                    conn.close()
                     continue
 
                 # проверка на пятидневку
@@ -733,7 +705,6 @@ for event in longpoll.listen():
                 '''
                 if user_msg[0][0] in ('sh', 'schedule', 'расписание', 'рп'):
                     sh_out()
-                    conn.close()
                     continue
 
                 '''
@@ -749,7 +720,6 @@ for event in longpoll.listen():
                             send_msg("Записал")
                         else:
                             sh_out()
-                        conn.close()
                         continue
 
                 '''
@@ -772,12 +742,10 @@ for event in longpoll.listen():
                                 send_msg("Записал")
                             else:
                                 sh_out()
-                            conn.close()
                             continue
                         else:
                             send_msg(
                                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу). Также возможны никто еще не заполнял первичное ДЗ командой дз, таким образом вам нечего дополнять.")
-                            conn.close()
                             continue
 
                 '''
@@ -794,7 +762,6 @@ for event in longpoll.listen():
                         else:
                             send_msg(
                                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
-                    conn.close()
                     continue
 
                 '''
@@ -803,7 +770,6 @@ for event in longpoll.listen():
                 '''
                 if user_msg[0][0] in ('id', 'айди'):
                     send_msg('ID беседы : ' + str(int(dialog_id) - 2000000000))
-                    conn.close()
                     continue
 
                 '''
@@ -819,18 +785,16 @@ for event in longpoll.listen():
                             if fetch and fetch[0]['data']:
                                 data = json.loads(fetch[0]['data'])
                                 if "cleantime" in data.keys():
-                                    data.pop("cleantime" )
+                                    data.pop("cleantime")
                                 data = conn.escape(str(json.dumps(data)))
                                 cursor.execute(f'update dialogs set data={data} where id="{dialog_id}"')
                                 conn.commit()
                             send_msg("Отключил автоочистку")
-                            conn.close()
                             continue
                         else:
                             cleantime = [int(i) for i in user_msg[0][1].split(':')]
                     except ValueError:
                         send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
-                        conn.close()
                         continue
 
                     # проверка, что время в нужном формате
@@ -848,7 +812,6 @@ for event in longpoll.listen():
                         send_msg(f"Установил время автоочистки на {user_msg[0][1]}")
                     else:
                         send_msg('Неверное время. Время должно быть только в :00 или :30')
-                    conn.close()
                     continue
 
                 '''
@@ -858,19 +821,20 @@ for event in longpoll.listen():
                 if user_msg[0][0] in ('help', 'помощь'):
                     send_msg(help_msg)
 
-                conn.close()
             except Exception as exc:
                 print("general end exc: ", exc)
-                conn.close()
                 send_msg("Хватить меня бить:`(")
                 vk.messages.send(
                     peer_ids=event.object['peer_id'],
                     random_id=random.random(),
                     sticker_id=random.choice(error_stickers)
                 )
+                conn.close()
+                conn, cursor = db_conn()
                 continue
 
-        if 'action' in event.object.keys() and event.object['action']['type'] == 'chat_invite_user' and event.object['action']['member_id'] == -group_id:
+        if 'action' in event.object.keys() and event.object['action']['type'] == 'chat_invite_user' and \
+                event.object['action']['member_id'] == -group_id:
             cursor.execute(f'select id from dialogs where id="{int(dialog_id)}"')
             if not cursor.fetchall():
                 cursor.execute(f'insert into dialogs values("{int(dialog_id)}", NULL)')
@@ -883,4 +847,3 @@ for event in longpoll.listen():
                 )
                 send_msg(
                     'Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
-            conn.close()
