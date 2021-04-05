@@ -15,7 +15,7 @@ import json
 
 session = requests.Session()
 
-prod = False  # True - prod, False - test
+prod = True  # True - prod, False - test
 with open('config.txt', 'r') as config:
     config = config.read().split('\n')
 if prod:
@@ -79,9 +79,9 @@ vk.com/@hosbobot-komandy
 '''
 
 
-def send_msg(msg, att=''):
+def send_msg(dialog_id, msg, att=''):
     return vk.messages.send(
-        peer_ids=event.object['peer_id'],
+        peer_ids=dialog_id,
         random_id=random.random(),
         message=msg,
         attachment=att
@@ -142,17 +142,20 @@ def sh_out():
             try:
                 if not conv:
                     raise vk_api.exceptions.ApiError
-                vk.messages.edit(peer_id=event.object['peer_id'],
+                vk.messages.edit(peer_id=dialog_id,
                                  message=text,
                                  conversation_message_id=int(conv[0]['lessons']),
                                  attachment=attach)
-                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=conv[0]['lessons'])
-                send_msg("Отредачил закреп")
+                vk.messages.pin(peer_id=dialog_id, conversation_message_id=conv[0]['lessons'])
+                send_msg(dialog_id, "Отредачил закреп")
             # вывод и закреп нового дз
             except Exception as exc:
                 print("exc in correct old", exc)
-                send_msg(text, attach)
-                vk.messages.pin(peer_id=event.object['peer_id'], conversation_message_id=next_botmsg_id)
+                send_msg(dialog_id, text, attach)
+                # id следующего сообщения бота
+                next_botmsg_id = int(event.object['conversation_message_id']) + 1
+
+                vk.messages.pin(peer_id=dialog_id, conversation_message_id=next_botmsg_id)
                 cursor.execute(f'select * from sh{dialog_id} where id=-1')
                 if cursor.fetchall():
                     cursor.execute(f'update {"sh" + dialog_id} set lessons="{str(next_botmsg_id)}" where id=-1')
@@ -161,9 +164,9 @@ def sh_out():
                     cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
                     conn.commit()
         else:
-            send_msg(text, attach)
+            send_msg(dialog_id, text, attach)
     else:
-        send_msg(
+        send_msg(dialog_id,
             "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
 
 
@@ -280,7 +283,7 @@ def add_hw(user_msg, day):
                 conn.commit()
 
             else:
-                send_msg(
+                send_msg(dialog_id,
                     "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
         else:  # запись дз на следующий урок
             photo_day, next_write, kucha = to_next_lesson(day, "add_hw")
@@ -455,8 +458,9 @@ def planned_clean():
             vk.messages.send(
                 peer_ids=dialogclean_id,
                 random_id=random.random(),
-                message='Очистил дз на сегодня'
+                message='Очистил дз на сегодня ⏰'
             )
+            sh_out(dialogclean_id)
 
 
 def delete_dialog(dialog_id):
@@ -499,10 +503,11 @@ def check_if_in_dialog():
 
 schedule.every().hour.at(':00').do(planned_clean)
 schedule.every().hour.at(':30').do(planned_clean)
-
-
 # schedule.every().sunday.at('00:00').do(check_if_in_dialog)
 # check_if_in_dialog()
+
+
+conn, cursor = db_conn()
 
 
 def halfanhourclean():
@@ -514,7 +519,6 @@ def halfanhourclean():
 x = threading.Thread(target=halfanhourclean)
 x.start()
 
-conn, cursor = db_conn()
 
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
@@ -532,7 +536,7 @@ for event in longpoll.listen():
                 # обработка обращений
                 if '@hosbobot' in user_msg[0][0]:
                     if len(user_msg[0]) == 1:
-                        send_msg(random.choice(empty_req_answers))
+                        send_msg(dialog_id, random.choice(empty_req_answers))
                         continue
                     user_msg[0] = user_msg[0][1:]
                 if '@' in user_msg[0][0]:
@@ -543,9 +547,6 @@ for event in longpoll.listen():
                     user_msg[0][0] = user_msg[0][0][1:]
                 else:
                     continue
-
-                # id следующего сообщения бота
-                next_botmsg_id = int(event.object['conversation_message_id']) + 1
 
                 # God Mode
                 if dialog_id in ("167849130", "182293940"):
@@ -559,7 +560,7 @@ for event in longpoll.listen():
                             cursor.execute(req)
                             conn.commit()
                         except Exception as exc:
-                            send_msg('Ошибка:\n' + str(exc))
+                            send_msg(dialog_id, 'Ошибка:\n' + str(exc))
                             continue
                         raw_fetch = cursor.fetchall()
                         if raw_fetch:
@@ -574,7 +575,7 @@ for event in longpoll.listen():
                                 fetch[n + 1] = ' '.join([str(k) for k in fetch[n + 1]])
                         else:
                             fetch = raw_fetch
-                        send_msg("Done Admin!\n{}".format('\n'.join(fetch)))
+                        send_msg(dialog_id, "Done Admin!\n{}".format('\n'.join(fetch)))
 
                     '''
                         !sc // send to some chat
@@ -588,7 +589,7 @@ for event in longpoll.listen():
                             random_id=random.random(),
                             message='\n'.join(user_msg)
                         )
-                        send_msg("Done Admin!")
+                        send_msg(dialog_id, "Done Admin!")
 
                     '''
                         !new // new bot chat authorization
@@ -599,13 +600,13 @@ for event in longpoll.listen():
                         # проверка на уже существующую беседу в БД
                         cursor.execute(f'select id from dialogs where id="{chat_id}"')
                         if cursor.fetchall():
-                            send_msg("Эта беседа уже авторизована")
+                            send_msg(dialog_id, "Эта беседа уже авторизована")
                             continue
                         # создание таблиц для новой беседы
                         cursor.execute(f'insert into dialogs values("{chat_id}", NULL)')
                         cursor.execute(f'create table {"sh" + str(chat_id)} (id integer, lessons text)')
                         cursor.execute(f'create table {"hw" + str(chat_id)} (id integer, schedule text, hw text)')
-                        send_msg("Бот готов работать в этой беседе. Напомни им про админку для него!")
+                        send_msg(dialog_id, "Бот готов работать в этой беседе. Напомни им про админку для него!")
 
                     '''
                         !spam // send msg to all
@@ -626,7 +627,7 @@ for event in longpoll.listen():
                                 message='\n'.join(user_msg),
                                 attachment=attach_wall
                             )
-                        send_msg("Done Admin!")
+                        send_msg(dialog_id, "Done Admin!")
 
                     # разрыв соединения с БД и конец итерации
                     continue
@@ -655,7 +656,7 @@ for event in longpoll.listen():
                         auth_bot = True
                         break
                 if not auth_bot:
-                    send_msg("Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
+                    send_msg(dialog_id, "Эта беседа еще не приобрела подписку, либо менеджер еще не занес эту беседу в базу.")
                     continue'''
 
                 # -----------------------------------------
@@ -686,7 +687,7 @@ for event in longpoll.listen():
                         clean(day, cursor.fetchall())
                         sh_out()
                     else:
-                        send_msg('Пожалуйста, укажите день')
+                        send_msg(dialog_id, 'Пожалуйста, укажите день')
                     continue
 
                 # проверка на пятидневку
@@ -717,7 +718,7 @@ for event in longpoll.listen():
                         user_msg[0] = ' '.join(user_msg[0][1:])
                         not_sh_out = add_hw(user_msg, day)
                         if not_sh_out:
-                            send_msg("Записал")
+                            send_msg(dialog_id, "Записал")
                         else:
                             sh_out()
                         continue
@@ -739,12 +740,12 @@ for event in longpoll.listen():
                         if hw and lessons_l:
                             not_sh_out = upd_hw(user_msg, day, lessons_l, hw)
                             if not_sh_out:
-                                send_msg("Записал")
+                                send_msg(dialog_id, "Записал")
                             else:
                                 sh_out()
                             continue
                         else:
-                            send_msg(
+                            send_msg(dialog_id,
                                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу). Также возможны никто еще не заполнял первичное ДЗ командой дз, таким образом вам нечего дополнять.")
                             continue
 
@@ -760,8 +761,10 @@ for event in longpoll.listen():
                             clean(day, lessons_l)
                             sh_out()
                         else:
-                            send_msg(
+                            send_msg(dialog_id,
                                 "У вас не заполнено расписание. Для работы бота необходимо заполнить расписание на каждый учебный день(с понедельника по субботу)")
+                    else:
+                        send_msg(dialog_id, 'Укажите день')
                     continue
 
                 '''
@@ -769,7 +772,7 @@ for event in longpoll.listen():
                     format: !id
                 '''
                 if user_msg[0][0] in ('id', 'айди'):
-                    send_msg('ID беседы : ' + str(int(dialog_id) - 2000000000))
+                    send_msg(dialog_id, 'ID беседы : ' + str(int(dialog_id) - 2000000000))
                     continue
 
                 '''
@@ -789,12 +792,12 @@ for event in longpoll.listen():
                                 data = conn.escape(str(json.dumps(data)))
                                 cursor.execute(f'update dialogs set data={data} where id="{dialog_id}"')
                                 conn.commit()
-                            send_msg("Отключил автоочистку")
+                            send_msg(dialog_id, "Отключил автоочистку")
                             continue
                         else:
                             cleantime = [int(i) for i in user_msg[0][1].split(':')]
                     except ValueError:
-                        send_msg('Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
+                        send_msg(dialog_id, 'Неверное время. Время должно быть в формате ЧЧ:ММ и только в :00 или :30')
                         continue
 
                     # проверка, что время в нужном формате
@@ -809,9 +812,9 @@ for event in longpoll.listen():
                         data = conn.escape(str(json.dumps(data)))
                         cursor.execute(f'update dialogs set data={data} where id="{dialog_id}"')
                         conn.commit()
-                        send_msg(f"Установил время автоочистки на {user_msg[0][1]}")
+                        send_msg(dialog_id, f"Установил время автоочистки на {user_msg[0][1]}")
                     else:
-                        send_msg('Неверное время. Время должно быть только в :00 или :30')
+                        send_msg(dialog_id, 'Неверное время. Время должно быть только в :00 или :30')
                     continue
 
                 '''
@@ -819,11 +822,11 @@ for event in longpoll.listen():
                     format: !help
                 '''
                 if user_msg[0][0] in ('help', 'помощь'):
-                    send_msg(help_msg)
+                    send_msg(dialog_id, help_msg)
 
             except Exception as exc:
                 print("general end exc: ", exc)
-                send_msg("Хватить меня бить:`(")
+                send_msg(dialog_id, "Хватить меня бить:`(")
                 vk.messages.send(
                     peer_ids=event.object['peer_id'],
                     random_id=random.random(),
@@ -845,5 +848,5 @@ for event in longpoll.listen():
                     random_id=random.random(),
                     sticker_id='21'
                 )
-                send_msg(
+                send_msg(dialog_id,
                     'Всем привет!\nПервым делом для работы мне нужна админка\nКак только добавите, !помощь для получения команд')
