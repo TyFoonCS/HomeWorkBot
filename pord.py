@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = False  # True - prod, False - test
+prod = True  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -76,12 +76,15 @@ vk.com/@hosbobot-komandy
 
 
 def send_msg(msg, att=''):
-    return vk.messages.send(
-        peer_ids=event.object['peer_id'],
-        random_id=random.random(),
-        message=msg,
-        attachment=att
-    )
+    try:
+        return vk.messages.send(
+            peer_ids=event.object['peer_id'],
+            random_id=random.random(),
+            message=msg,
+            attachment=att
+        )
+    except Exception:
+        print("send умер")
 
 
 # вывод расписания с дз
@@ -436,7 +439,7 @@ for event in longpoll.listen():
             if fetch and fetch[0]:
                 dialog_id = fetch[0]['conv']
             else:
-                send_msg("Ты еще не засветился ни в одной классной беседе\nПопробуй написать !рп в беседу своего класса, а потом возвращайся сюда")
+                send_msg("Ты еще не засветился ни в одной классной беседе\nПопробуй написать что-нибудь в беседу своего класса, а потом возвращайся сюда")
         dialog_id = str(dialog_id)
         if event.object['text']:
             try:
