@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = False  # True - prod, False - test
+prod = True  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
