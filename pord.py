@@ -12,7 +12,7 @@ import json
 
 session = requests.Session()
 
-prod = True  # True - prod, False - test
+prod = False  # True - prod, False - test
 if prod:
     vk_session = vk_api.VkApi(
         token='c2dc3932c3553f743ee9f87a78bdfce9274f9211732aa85a49d5515964c9b4175a4e604d95b3c0329bf8b')  # prod
@@ -152,6 +152,8 @@ def sh_out():
                         cursor.execute(f'insert into {"sh" + dialog_id} values (-1, "{str(next_botmsg_id)}")')
                         conn.commit()
         else:
+            if not personal:
+                text += "Рекомендуем смотреть ДЗ и расписание не на следующий день в личке с ботом"
             send_msg(text, attach)
     else:
         send_msg(
@@ -439,7 +441,8 @@ for event in longpoll.listen():
             if fetch and fetch[0]:
                 dialog_id = fetch[0]['conv']
             else:
-                send_msg("Ты еще не засветился ни в одной классной беседе\nПопробуй написать что-нибудь в беседу своего класса, а потом возвращайся сюда")
+                send_msg(
+                    "Ты еще не засветился ни в одной классной беседе\nПопробуй написать что-нибудь в беседу своего класса, а потом возвращайся сюда")
         dialog_id = str(dialog_id)
         if event.object['text']:
             try:
@@ -502,10 +505,10 @@ for event in longpoll.listen():
                                 fetch.append([])
                                 for j in list(i.keys()):
                                     if "\\u" in str(i[j]):
-                                        fetch[n+1].append(json.loads(i[j]))
+                                        fetch[n + 1].append(json.loads(i[j]))
                                     else:
-                                        fetch[n+1].append(i[j])
-                                fetch[n+1] = ' '.join([str(k) for k in fetch[n+1]])
+                                        fetch[n + 1].append(i[j])
+                                fetch[n + 1] = ' '.join([str(k) for k in fetch[n + 1]])
                         else:
                             fetch = raw_fetch
                         send_msg("Done Admin!\n{}".format('\n'.join(fetch)))
@@ -562,10 +565,6 @@ for event in longpoll.listen():
                                 attachment=attach_wall
                             )
                         send_msg("Done Admin!")
-
-                    # разрыв соединения с БД и конец итерации
-                    conn.close()
-                    continue
 
                 # определение дня
                 user_day = False
@@ -735,7 +734,8 @@ for event in longpoll.listen():
                 )
                 continue
 
-        if 'action' in event.object.keys() and event.object['action']['type'] == 'chat_invite_user' and event.object['action']['member_id'] == -group_id:
+        if 'action' in event.object.keys() and event.object['action']['type'] == 'chat_invite_user' and \
+                event.object['action']['member_id'] == -group_id:
             cursor.execute(f'select id from dialogs where id="{int(dialog_id)}"')
             if not cursor.fetchall():
                 cursor.execute(f'insert into dialogs values("{int(dialog_id)}", NULL)')
