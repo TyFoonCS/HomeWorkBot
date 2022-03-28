@@ -179,7 +179,7 @@ def to_next_lesson(day, mode):
     rewritten_days = []
     # расписание по дням
     schedule_days = get_schedules()
-    kucha = []
+    kucha = ''
     for k, words in enumerate(user_msg):
         # день следующего урока
         current = now_day
@@ -195,7 +195,7 @@ def to_next_lesson(day, mode):
                 lesson_days.append(int(schedule_day))
 
         if not lesson_days:
-            kucha.append(words)
+            kucha += ' '.join(words) + '-i-'
             continue
         # выбор дня ближайшего урока
         for i in lesson_days:
@@ -238,7 +238,7 @@ def do_kucha(day, kucha, mode):
     if mode == "add_hw":
         hw_kucha['kucha'] = kucha
     elif mode == "upd_hw":
-        hw_kucha['kucha'] += '-i-' + kucha
+        hw_kucha['kucha'] += kucha
     hw_kucha = conn.escape(json.dumps(hw_kucha))
     cursor.execute(f'update {"hw" + dialog_id} set hw={hw_kucha} where id="{day}"')
     conn.commit()
